@@ -1,0 +1,11 @@
+services:
+  app-user-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:80"
+    container_name: app-user-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
