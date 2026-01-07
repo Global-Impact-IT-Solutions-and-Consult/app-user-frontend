@@ -18,13 +18,9 @@ import {
     Eye,
     Copy,
     Link2,
-    Tablet,
     TabletSmartphone,
-    FileWarning,
-    MessageSquareWarning,
     MessageCircleWarning,
     UserLock,
-    CheckCircle,
     Check
 } from "lucide-react";
 import { cn } from "../lib/utils";
