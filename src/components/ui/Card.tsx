@@ -19,6 +19,7 @@ const Card = ({ className, children, ...props }: CardProps) => {
 
 export interface StatCardProps extends CardProps {
     icon: React.ReactNode;
+    iconBg: string;
     label: string;
     value: string | number;
     trend?: {
@@ -31,6 +32,7 @@ export interface StatCardProps extends CardProps {
 const StatCard = ({
     className,
     icon,
+    iconBg,
     label,
     value,
     trend,
@@ -40,7 +42,7 @@ const StatCard = ({
     return (
         <Card className={cn("p-5 space-y-4", className)} {...props}>
             <div className="flex items-start justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100 text-primary-500">
+                <div className={cn("flex h-8 w-8 items-center justify-center rounded-md", iconBg)}>
                     {icon}
                 </div>
                 {trend && (
@@ -58,9 +60,9 @@ const StatCard = ({
                 <div className="text-2xl font-bold text-surface-900 tracking-tight">
                     {value}
                 </div>
-                <div className="text-sm font-medium text-surface-400 mt-1">{label}</div>
+                <div className="text-sm font-medium text-surface-900/70 mt-1">{label}</div>
                 {subtext && (
-                    <div className="text-xs text-surface-400 mt-0.5">{subtext}</div>
+                    <div className="text-xs text-surface-900/70 mt-0.5">{subtext}</div>
                 )}
             </div>
         </Card>

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     FileText,
@@ -14,30 +15,35 @@ import { Badge } from "./ui/Badge";
 interface NavItemProps {
     icon: React.ElementType;
     label: string;
-    isActive?: boolean;
-    onClick?: () => void;
+    to: string;
+    end?: boolean;
 }
 
-const NavItem = ({ icon: Icon, label, isActive, onClick }: NavItemProps) => (
-    <button
-        onClick={onClick}
-        className={cn(
+const NavItem = ({ icon: Icon, label, to, end }: NavItemProps) => (
+    <NavLink
+        to={to}
+        end={end}
+        className={({ isActive }) => cn(
             "group flex w-full items-center gap-3 px-4 py-3 text-sm font-medium transition-all relative",
             isActive
                 ? "bg-primary-50 text-primary-500 border-l-4 border-primary-500"
                 : "text-surface-900 hover:bg-surface-100 border-l-4 border-transparent"
         )}
     >
-        <Icon className={cn("h-5 w-5 transition-colors", isActive ? "text-primary-500" : "text-surface-900 group-hover:text-primary-500")} />
-        {label}
-    </button>
+        {({ isActive }) => (
+            <>
+                <Icon className={cn("h-5 w-5 transition-colors", isActive ? "text-primary-500" : "text-surface-900 group-hover:text-primary-500")} />
+                {label}
+            </>
+        )}
+    </NavLink>
 );
 
 export const Sidebar = () => {
-    const [activeTab, setActiveTab] = React.useState("Dashboard");
+    const navigate = useNavigate();
 
     return (
-        <aside className="flex h-screen w-64 flex-col border-r border-surface-300 bg-white">
+        <aside className="flex h-screen w-64 flex-col border-r border-surface-300 bg-white shrink-0">
             {/* Brand Logo */}
             <div className="flex h-24 items-center justify-center border-b border-surface-100">
                 <h1 className="font-serif text-3xl font-bold tracking-tight text-primary-700">
@@ -46,30 +52,28 @@ export const Sidebar = () => {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 pt-4">
+            <nav className="flex-1 pt-4 overflow-y-auto">
                 <NavItem
                     icon={LayoutDashboard}
                     label="Dashboard"
-                    isActive={activeTab === "Dashboard"}
-                    onClick={() => setActiveTab("Dashboard")}
+                    to="/dashboard"
+                    end
                 />
+
                 <NavItem
                     icon={FileText}
                     label="Invoices"
-                    isActive={activeTab === "Invoices"}
-                    onClick={() => setActiveTab("Invoices")}
+                    to="/dashboard/invoices"
                 />
                 <NavItem
                     icon={Clock}
                     label="Logs"
-                    isActive={activeTab === "Logs"}
-                    onClick={() => setActiveTab("Logs")}
+                    to="/dashboard/logs"
                 />
                 <NavItem
                     icon={Settings}
                     label="Settings"
-                    isActive={activeTab === "Settings"}
-                    onClick={() => setActiveTab("Settings")}
+                    to="/dashboard/settings"
                 />
             </nav>
 
@@ -98,7 +102,11 @@ export const Sidebar = () => {
                         <p className="truncate text-[10px] text-surface-400 font-medium">NG-APP-5678-ACME</p>
                     </div>
                 </div>
-                <Button variant="outline" className="w-full h-11 gap-2 bg-primary-50/30 border-primary-100 text-surface-900 hover:bg-primary-50/50">
+                <Button
+                    variant="outline"
+                    className="w-full h-11 gap-2 bg-primary-50/30 border-primary-100 text-surface-900 hover:bg-primary-50/50"
+                    onClick={() => navigate("/login")}
+                >
                     <LogOutIcon className="h-4 w-4" />
                     Log Out
                 </Button>
@@ -106,3 +114,4 @@ export const Sidebar = () => {
         </aside>
     );
 };
+
