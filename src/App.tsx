@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import VerifyAccount from "./pages/VerifyAccount";
@@ -6,6 +6,11 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import OnboardingFlow from "./pages/OnboardingFlow";
 import Dashboard from "./pages/Dashboard";
+import Invoices from "./pages/Invoices";
+import InvoiceDetails from "./pages/InvoiceDetails";
+import Logs from "./pages/Logs";
+import Settings from "./pages/Settings";
+import { DashboardLayout } from "./components/DashboardLayout";
 
 function App() {
   return (
@@ -17,11 +22,22 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/onboarding" element={<OnboardingFlow />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+
+      {/* Dashboard Routes with Shared Layout */}
+      <Route path="/dashboard" element={<DashboardLayout><Outlet /></DashboardLayout>}>
+        <Route index element={<Dashboard />} />
+        <Route path="invoices" element={<Invoices />} />
+        <Route path="invoices/:id" element={<InvoiceDetails />} />
+        <Route path="logs" element={<Logs />} />
+        <Route path="settings" element={<Settings />} />
+      </Route>
     </Routes>
   );
 }
 
+
+
 export default App;
+
 
 
