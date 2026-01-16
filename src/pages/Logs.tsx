@@ -15,6 +15,7 @@ import {
     ChevronRight,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useLogStore } from "../store/logStore";
 
 const tabs = [
     { label: "All Logs", id: "all" },
@@ -22,69 +23,6 @@ const tabs = [
     { label: "Webhooks", id: "webhooks" },
     { label: "Systems", id: "systems" },
     { label: "Errors", id: "errors" },
-];
-
-const mockLogs = [
-    {
-        timestamp: "2025-11-08 14:23:45",
-        type: "API Call",
-        status: "Invoice submitted successfully to NRS for clearance",
-        statusType: "success"
-    },
-    {
-        timestamp: "2025-11-08 14:23:45",
-        type: "Webhook",
-        status: "Invoice cleared by NRS, status: TRANSMITTING",
-        statusType: "success"
-    },
-    {
-        timestamp: "2025-11-08 14:15:30",
-        type: "System",
-        status: "Database connection pool nearing capacity (85%)",
-        statusType: "warning"
-    },
-    {
-        timestamp: "2025-11-08 14:23:45",
-        type: "API Call",
-        status: "Invoice submitted successfully to NRS for clearance",
-        statusType: "success"
-    },
-    {
-        timestamp: "2025-11-08 14:23:45",
-        type: "API Call",
-        status: "Invoice submitted successfully to NRS for clearance",
-        statusType: "success"
-    },
-    {
-        timestamp: "2025-11-08 14:15:30",
-        type: "Error",
-        status: "Failed to decrypt invoice data: Invalid encryption key",
-        statusType: "error"
-    },
-    {
-        timestamp: "2025-11-08 14:23:45",
-        type: "API Call",
-        status: "Invoice submitted successfully to NRS for clearance",
-        statusType: "success"
-    },
-    {
-        timestamp: "2025-11-08 14:15:30",
-        type: "API Call",
-        status: "Validation failed: Missing required field \"business_id\"",
-        statusType: "error"
-    },
-    {
-        timestamp: "2025-11-08 14:23:45",
-        type: "API Call",
-        status: "Invoice submitted successfully to NRS for clearance",
-        statusType: "success"
-    },
-    {
-        timestamp: "2025-11-08 14:15:30",
-        type: "API Call",
-        status: "Database connection pool nearing capacity (85%)",
-        statusType: "warning"
-    }
 ];
 
 const StatCard = ({ icon: Icon, value, label, colorClass }: { icon: any, value: string, label: string, colorClass: string }) => (
@@ -98,37 +36,72 @@ const StatCard = ({ icon: Icon, value, label, colorClass }: { icon: any, value: 
 );
 
 export default function Logs() {
+    const { logs, totalLogs, isLoading, fetchLogs, clearLogs } = useLogStore();
+
     const [activeTab, setActiveTab] = React.useState("all");
     const [searchQuery, setSearchQuery] = React.useState("");
     const [timeRange, setTimeRange] = React.useState("All Types");
     const [statusFilter, setStatusFilter] = React.useState("All Statuses");
     const [logLevel, setLogLevel] = React.useState("All Level");
+    const [page, setPage] = React.useState(1);
+    const limit = 20;
 
+    React.useEffect(() => {
+        const params: any = {
+            page,
+            limit
+        };
+
+        if (activeTab !== "all") {
+            // Mapping tab "id" to API filter if supported
+            // params.type = activeTab; 
+        }
+
+        if (searchQuery) {
+            params.search = searchQuery;
+        }
+
+        fetchLogs(params);
+    }, [activeTab, searchQuery, timeRange, statusFilter, logLevel, page, fetchLogs]);
+
+    const handleClearLogs = async () => {
+        if (confirm("Are you sure you want to clear all logs?")) {
+            await clearLogs();
+        }
+    };
+
+    // Client-side filtering fallback
     const filteredLogs = React.useMemo(() => {
-        return mockLogs.filter((log) => {
+        return logs.filter((log) => {
+            const type = log.source || log.category || "System";
+            const level = log.level || "info";
+
             // 1. Tab filtering
-            if (activeTab === "api" && log.type !== "API Call") return false;
-            if (activeTab === "webhooks" && log.type !== "Webhook") return false;
-            if (activeTab === "systems" && log.type !== "System") return false;
-            if (activeTab === "errors" && log.statusType !== "error") return false;
+            if (activeTab === "api" && !type.toLowerCase().includes("api")) return false;
+            if (activeTab === "webhooks" && !type.toLowerCase().includes("webhook")) return false;
+            if (activeTab === "systems" && !type.toLowerCase().includes("system")) return false;
+            if (activeTab === "errors" && level !== "error") return false;
 
             // 2. Select filters
-            if (statusFilter !== "All Statuses" && log.statusType !== statusFilter.toLowerCase()) return false;
-            // Note: Log level implementation depends on statusType for this mock
-            if (logLevel !== "All Level" && log.statusType !== logLevel.toLowerCase()) return false;
+            if (statusFilter !== "All Statuses") {
+                if (statusFilter === "Success" && level !== "success") return false;
+                if (statusFilter === "Warning" && level !== "warning") return false;
+                if (statusFilter === "Error" && level !== "error") return false;
+            }
+            if (logLevel !== "All Level" && level !== logLevel.toLowerCase()) return false;
 
             // 3. Search query
             if (searchQuery) {
                 const query = searchQuery.toLowerCase();
                 return (
-                    log.status.toLowerCase().includes(query) ||
-                    log.type.toLowerCase().includes(query)
+                    (log.message || "").toLowerCase().includes(query) ||
+                    type.toLowerCase().includes(query)
                 );
             }
 
             return true;
         });
-    }, [activeTab, searchQuery, statusFilter, logLevel]);
+    }, [logs, activeTab, searchQuery, statusFilter, logLevel]);
 
     return (
         <div className="p-8 space-y-6">
@@ -145,7 +118,7 @@ export default function Logs() {
                         <Upload className="h-4 w-4 text-primary-500" />
                         Export
                     </Button>
-                    <Button className="gap-2 h-11 px-6 font-bold">
+                    <Button className="gap-2 h-11 px-6 font-bold" onClick={handleClearLogs}>
                         <Trash2 className="h-4 w-4" />
                         Clear Logs
                     </Button>
@@ -164,26 +137,26 @@ export default function Logs() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                     icon={CheckCircle2}
-                    value="1,247"
+                    value={String(logs.filter(l => l.level === 'success' || l.level === 'info').length)}
                     label="Successful Calls"
                     colorClass="bg-success-50 text-success-500"
                 />
                 <StatCard
                     icon={XCircle}
-                    value="12"
+                    value={String(logs.filter(l => l.level === 'error').length)}
                     label="Errors Today"
                     colorClass="bg-danger-50 text-danger-500"
                 />
                 <StatCard
                     icon={ArrowRightLeft}
-                    value="89"
-                    label="API Calls (24h)"
+                    value={String(logs.filter(l => (l.source || '').toLowerCase().includes('api')).length)}
+                    label="API Calls (Page)"
                     colorClass="bg-primary-50 text-primary-500"
                 />
                 <StatCard
                     icon={Radio}
-                    value="156"
-                    label="Webhooks Received"
+                    value={String(logs.filter(l => (l.source || '').toLowerCase().includes('webhook')).length)}
+                    label="Webhooks (Page)"
                     colorClass="bg-primary-50 text-primary-500"
                 />
             </div>
@@ -261,36 +234,63 @@ export default function Logs() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
-                        {filteredLogs.map((log, index) => (
-                            <tr key={index} className="hover:bg-surface-50/50 transition-colors">
-                                <td className="px-6 py-4 text-surface-600 font-medium whitespace-nowrap">{log.timestamp}</td>
-                                <td className="px-6 py-4 text-surface-900 whitespace-nowrap">{log.type}</td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        {log.statusType === "success" && <CheckCircle2 className="h-4 w-4 text-success-500 shrink-0" />}
-                                        {log.statusType === "warning" && <AlertTriangle className="h-4 w-4 text-warning-500 shrink-0" />}
-                                        {log.statusType === "error" && <XCircle className="h-4 w-4 text-danger-500 shrink-0" />}
-                                        <span className="text-surface-600 font-medium leading-relaxed">{log.status}</span>
-                                    </div>
+                        {isLoading ? (
+                            <tr>
+                                <td colSpan={3} className="px-6 py-12 text-center text-surface-500">
+                                    Loading logs...
                                 </td>
                             </tr>
-                        ))}
+                        ) : filteredLogs.length === 0 ? (
+                            <tr>
+                                <td colSpan={3} className="px-6 py-12 text-center text-surface-500">
+                                    No logs found.
+                                </td>
+                            </tr>
+                        ) : (
+                            filteredLogs.map((log, index) => (
+                                <tr key={index} className="hover:bg-surface-50/50 transition-colors">
+                                    <td className="px-6 py-4 text-surface-600 font-medium whitespace-nowrap">
+                                        {new Date(log.timestamp).toLocaleString()}
+                                    </td>
+                                    <td className="px-6 py-4 text-surface-900 whitespace-nowrap">
+                                        {log.source || log.category || "System"}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            {log.level === "success" && <CheckCircle2 className="h-4 w-4 text-success-500 shrink-0" />}
+                                            {log.level === "info" && <CheckCircle2 className="h-4 w-4 text-primary-500 shrink-0" />}
+                                            {log.level === "warning" && <AlertTriangle className="h-4 w-4 text-warning-500 shrink-0" />}
+                                            {log.level === "error" && <XCircle className="h-4 w-4 text-danger-500 shrink-0" />}
+                                            <span className="text-surface-600 font-medium leading-relaxed">{log.message || log.metadata?.status}</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
 
                 {/* Pagination */}
                 <div className="px-6 py-4 bg-surface-50 border-t border-surface-200 flex items-center justify-between">
-                    <p className="text-xs text-surface-900/70">Showing 1-{filteredLogs.length} of {filteredLogs.length} logs</p>
+                    <p className="text-xs text-surface-900/70">
+                        {totalLogs > 0
+                            ? `Showing ${(page - 1) * limit + 1}-${Math.min(page * limit, totalLogs)} of ${totalLogs} logs`
+                            : "No logs"}
+                    </p>
                     <div className="flex items-center gap-2">
-                        <button className="p-1 hover:bg-surface-100 rounded text-surface-900/60">
+                        <button
+                            className="p-1 hover:bg-surface-100 rounded text-surface-900/60 disabled:opacity-50"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                        >
                             <ChevronLeft className="h-4 w-4" />
                         </button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded bg-primary-500 text-white text-xs font-bold shadow-sm">1</button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-surface-100 text-surface-600 text-xs font-medium">2</button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-surface-100 text-surface-600 text-xs font-medium">3</button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-surface-100 text-surface-600 text-xs font-medium">4</button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-surface-100 text-surface-600 text-xs font-medium">5</button>
-                        <button className="p-1 hover:bg-surface-100 rounded text-surface-900/60">
+                        <span className="text-xs font-medium text-surface-600">Page {page}</span>
+                        <button
+                            className="p-1 hover:bg-surface-100 rounded text-surface-900/60 disabled:opacity-50"
+                            onClick={() => setPage(p => p + 1)}
+                            disabled={page * limit >= totalLogs}
+                        >
                             <ChevronRight className="h-4 w-4" />
                         </button>
                     </div>

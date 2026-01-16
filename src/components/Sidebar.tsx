@@ -11,6 +11,7 @@ import {
 import { cn } from "../lib/utils";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
+import { useAuthStore } from "../store/authStore";
 
 interface NavItemProps {
     icon: React.ElementType;
@@ -41,6 +42,12 @@ const NavItem = ({ icon: Icon, label, to, end }: NavItemProps) => (
 
 export const Sidebar = () => {
     const navigate = useNavigate();
+    const { logout } = useAuthStore();
+
+    const handleLogout = () => {
+        logout();
+        navigate("/login");
+    };
 
     return (
         <aside className="flex h-screen w-64 flex-col border-r border-surface-300 bg-white shrink-0">
@@ -105,7 +112,7 @@ export const Sidebar = () => {
                 <Button
                     variant="outline"
                     className="w-full h-11 gap-2 bg-primary-50/30 border-primary-100 text-surface-900 hover:bg-primary-50/50"
-                    onClick={() => navigate("/login")}
+                    onClick={handleLogout}
                 >
                     <LogOutIcon className="h-4 w-4" />
                     Log Out

@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { useCompanyStore } from "../store/companyStore";
 
 export default function VerifyAccount() {
     const navigate = useNavigate();
     const { verifyMfa, resendOtp } = useAuthStore();
+    const { fetchCompanies } = useCompanyStore();   
     const [timer, setTimer] = useState(179); // 02:59 in seconds
     const [otp, setOtp] = useState(["", "", "", "", "", ""]);
     const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +61,7 @@ export default function VerifyAccount() {
 
         try {
             await verifyMfa(code);
+            await fetchCompanies();
             navigate("/dashboard");
         } catch (err: any) {
             setError(err.response?.data?.message || "Verification failed. Invalid code.");
