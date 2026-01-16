@@ -50,6 +50,7 @@ export const useAuthStore = create<AuthState>()(
             signup: async (data) => {
                 try {
                     const response = await api.post('/auth/signup', data);
+                    console.log("Signup response:", response);
                     // Handle potential nested data structure (NestJS common pattern)
                     // Try data.data first, then fallback to data
                     const result = response.data.data || response.data;
@@ -69,7 +70,7 @@ export const useAuthStore = create<AuthState>()(
             login: async (data) => {
                 try {
                     const response = await api.post('/auth/login', data);
-                    console.log(response.data.data);
+                    console.log("Login response:", response.data.data);
                     // Handle nested data structure: { data: { statusCode: 200, data: { ... } } }
                     const result = response.data.data
                     const { requiresMfa, tempToken, message } = result;
@@ -110,6 +111,7 @@ export const useAuthStore = create<AuthState>()(
                     };
 
                     const response = await api.post('/auth/verify-mfa', payload);
+                    console.log("Verify MFA response:", response.data.data);
                     const result = response.data.data || response.data;
                     const { accessToken, user } = result;
 
@@ -133,6 +135,7 @@ export const useAuthStore = create<AuthState>()(
                 }
                 try {
                     await api.post('/auth/resend-otp', { userId });
+                    console.log("Resend OTP successful");
                 } catch (error) {
                     console.error('Resend OTP failed:', error);
                     throw error;
@@ -153,6 +156,7 @@ export const useAuthStore = create<AuthState>()(
             setEnvironment: async (env) => {
                 try {
                     const response = await api.post('/auth/switch-environment', { environment: env });
+                    console.log("Switch environment successful", response);
                     const result = response.data.data || response.data;
                     const { accessToken, currentEnvironment, currentCompanyId } = result;
                     set(state => ({

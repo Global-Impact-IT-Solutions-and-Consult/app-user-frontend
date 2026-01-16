@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useLogStore } from "../store/logStore";
+import { useToast } from "../components/ui/Toast";
+import { ConfirmModal } from "../components/ui/ConfirmModal";
 
 const tabs = [
     { label: "All Logs", id: "all" },
@@ -45,6 +47,8 @@ export default function Logs() {
     const [logLevel, setLogLevel] = React.useState("All Level");
     const [page, setPage] = React.useState(1);
     const limit = 20;
+    const { toast } = useToast();
+    const [clearLogsOpen, setClearLogsOpen] = React.useState(false);
 
     React.useEffect(() => {
         const params: any = {
@@ -64,10 +68,14 @@ export default function Logs() {
         fetchLogs(params);
     }, [activeTab, searchQuery, timeRange, statusFilter, logLevel, page, fetchLogs]);
 
-    const handleClearLogs = async () => {
-        if (confirm("Are you sure you want to clear all logs?")) {
-            await clearLogs();
-        }
+    const handleClearLogsClick = () => {
+        setClearLogsOpen(true);
+    };
+
+    const handleConfirmClearLogs = async () => {
+        await clearLogs();
+        setClearLogsOpen(false);
+        toast({ title: "Logs cleared", description: "All system logs have been deleted.", variant: "success" });
     };
 
     // Client-side filtering fallback
@@ -118,7 +126,7 @@ export default function Logs() {
                         <Upload className="h-4 w-4 text-primary-500" />
                         Export
                     </Button>
-                    <Button className="gap-2 h-11 px-6 font-bold" onClick={handleClearLogs}>
+                    <Button className="gap-2 h-11 px-6 font-bold" onClick={handleClearLogsClick}>
                         <Trash2 className="h-4 w-4" />
                         Clear Logs
                     </Button>
@@ -296,6 +304,15 @@ export default function Logs() {
                     </div>
                 </div>
             </div>
-        </div>
+
+            <ConfirmModal
+                isOpen={clearLogsOpen}
+                onClose={() => setClearLogsOpen(false)}
+                onConfirm={handleConfirmClearLogs}
+                title="Clear Logs"
+                description="Are you sure you want to clear all logs? This action cannot be undone."
+                confirmText="Clear Logs"
+            />
+        </div >
     );
 }

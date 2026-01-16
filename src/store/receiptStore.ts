@@ -73,6 +73,7 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
         set({ isLoading: true, error: null });
         try {
             const response = await api.get(`/receipts/${id}`);
+            console.log(response);
             const result = response.data.data || response.data;
             set({ currentReceipt: result });
         } catch (error: any) {
@@ -87,6 +88,7 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
         // or we can add a specific loading state for logs
         try {
             const response = await api.get(`/receipts/${id}/logs`, { params });
+            console.log(response);
             const result = response.data.data || response.data;
             set({ currentReceiptLogs: Array.isArray(result) ? result : (result.logs || []) });
         } catch (error: any) {
@@ -100,6 +102,7 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
                 params: { format },
                 responseType: 'blob'
             });
+            console.log(response);
             // Create a blob link to download
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');

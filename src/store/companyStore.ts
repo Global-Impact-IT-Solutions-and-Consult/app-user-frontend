@@ -2,16 +2,31 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '../lib/api';
 
-interface CompanySetting {
+export interface CompanyMember {
+    id: string;
+    email: string;
+    // Add other fields from response
+    roles: string[];
+    isActive: boolean;
+    lastLoginAt: string;
+    firstName?: string; // If available or derived
+    lastName?: string;
+}
+
+export interface CompanySetting {
     id: string;
     type: 'test' | 'live';
     publicKey: string | null;
     secretKeyHash?: string | null;
     isActive: boolean;
+    nrsClientId?: string;
+    nrsClientSecret?: string;
+    webhooks: any[]; // refined later
 }
 
-interface CompanySettingsGroup {
+export interface CompanySettingsResponse {
     id: string;
+    companyId: string;
     mfaRequired: boolean;
     settings: CompanySetting[];
 }
@@ -22,15 +37,14 @@ interface Company {
     legalName?: string;
     taxId?: string;
     status: string;
-    documents: object;
-    approvedAt: string;
-    approvedBy: string;
+    documents: any;
+    approvedAt: string | null;
+    approvedBy: string | null;
     isActive: boolean;
-    onboardingSteps: {};
+    onboardingSteps: any;
     createdAt: string;
     updatedAt: string;
-    companySettings: CompanySettingsGroup[];
-    // Add other properties as needed based on API response
+    members: CompanyMember[];
 }
 
 interface Webhook {
@@ -57,6 +71,7 @@ interface CompanyState {
     currentCompany: Company | null;
     isLoading: boolean;
     error: string | null;
+    companySettings: CompanySettingsResponse | null;
     webhooks: Webhook[];
     apiKeys: ApiKey[];
 
@@ -71,9 +86,10 @@ interface CompanyState {
     updateWebhook: (companyId: string, webhookId: string, data: any) => Promise<void>;
 
     // API Keys
+    fetchCompanySettings: (companyId: string) => Promise<void>;
     fetchApiKeys: (companyId: string) => Promise<void>;
     revokeApiKey: (companyId: string, keyId: string) => Promise<void>;
-    regenerateApiKey: (companyId: string, keyId: string) => Promise<void>;
+    regenerateApiKey: (companyId: string, userId: string, type: 'live' | 'test') => Promise<void>;
 }
 
 export const useCompanyStore = create<CompanyState>()(
@@ -83,6 +99,7 @@ export const useCompanyStore = create<CompanyState>()(
             currentCompany: null,
             isLoading: false,
             error: null,
+            companySettings: null,
             webhooks: [],
             apiKeys: [],
 
@@ -90,6 +107,7 @@ export const useCompanyStore = create<CompanyState>()(
                 set({ isLoading: true, error: null });
                 try {
                     const response = await api.post('/companies', data);
+                    console.log(response);
                     const result = response.data.data || response.data;
 
                     // The result is the full company object with settings as per user provided/log
@@ -134,6 +152,7 @@ export const useCompanyStore = create<CompanyState>()(
                 set({ isLoading: true, error: null });
                 try {
                     const response = await api.get(`/companies/${companyId}/webhooks`);
+                    console.log("Webhooks:", response);
                     const result = response.data.data || response.data;
                     set({ webhooks: result });
                 } catch (error: any) {
@@ -153,6 +172,7 @@ export const useCompanyStore = create<CompanyState>()(
                     set(state => ({ webhooks: [...state.webhooks, result] }));
                     return result;
                 } catch (error: any) {
+                    console.error("Failed to create webhook", error);
                     set({ error: error.response?.data?.message || 'Failed to create webhook' });
                     throw error;
                 } finally {
@@ -163,12 +183,29 @@ export const useCompanyStore = create<CompanyState>()(
             updateWebhook: async (companyId, webhookId, data) => {
                 set({ isLoading: true, error: null });
                 try {
-                    await api.put(`/companies/${companyId}/webhooks/${webhookId}`, data);
+                    const response = await api.put(`/companies/${companyId}/webhooks/${webhookId}`, data);
+                    console.log("Updated webhook:", response);
+                    // const result = response.data.data || response.data;
                     // Verify if PUT returns updated object or we just fetch fresh list
                     await useCompanyStore.getState().fetchWebhooks(companyId);
                 } catch (error: any) {
+                    console.error("Failed to update webhook", error);
                     set({ error: error.response?.data?.message || 'Failed to update webhook' });
                     throw error;
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
+
+            fetchCompanySettings: async (companyId) => {
+                set({ isLoading: true, error: null });
+                try {
+                    const response = await api.get(`/company-settings/company/${companyId}`);
+                    console.log("Company settings:", response);
+                    const result = response.data.data || response.data;
+                    set({ companySettings: result });
+                } catch (error: any) {
+                    console.error("Failed to fetch company settings", error);
                 } finally {
                     set({ isLoading: false });
                 }
@@ -178,6 +215,7 @@ export const useCompanyStore = create<CompanyState>()(
                 set({ isLoading: true, error: null });
                 try {
                     const response = await api.get(`/companies/${companyId}/api-keys`);
+                    console.log("API keys:", response);
                     const result = response.data.data || response.data;
                     set({ apiKeys: result });
                 } catch (error: any) {
@@ -190,10 +228,12 @@ export const useCompanyStore = create<CompanyState>()(
             revokeApiKey: async (companyId, keyId) => {
                 set({ isLoading: true, error: null });
                 try {
-                    await api.delete(`/companies/${companyId}/api-keys/${keyId}`);
+                    const response = await api.delete(`/companies/${companyId}/api-keys/${keyId}`);
+                    console.log("API key revoked successfully", response);
                     // Refresh list
                     set(state => ({ apiKeys: state.apiKeys.filter(k => k.id !== keyId) }));
                 } catch (error: any) {
+                    console.error("Failed to revoke API key", error);
                     set({ error: error.response?.data?.message || 'Failed to revoke API key' });
                     throw error;
                 } finally {
@@ -201,18 +241,26 @@ export const useCompanyStore = create<CompanyState>()(
                 }
             },
 
-            regenerateApiKey: async (companyId, keyId) => {
+            regenerateApiKey: async (companyId, userId, type) => {
                 set({ isLoading: true, error: null });
                 try {
-                    // Assuming a regenerate endpoint exists or we use create to make new one and delete old one if explicit regenerate isn't there.
-                    // Docs showed /regenerate-secret for webhooks but not explicitly for api keys in the summary I saw, but often it exists.
-                    // If not, we might just call create. For now I'll assume a similar pattern or just refresh.
-                    // Actually, usually it's a POST to separate endpoint. I'll leave placeholder or try a standard pattern.
-                    // Let's assume we just refresh the list for now if this action is triggered from UI as "Roll Key".
-                    // Ideally we POST to /api-keys to create a new one.
-                    await useCompanyStore.getState().fetchApiKeys(companyId);
+                    const response = await api.put(`/companies/${companyId}/api-keys`, {
+                        companyId,
+                        userId,
+                        settingsType: type
+                    });
+                    console.log("API key regenerated successfully", response);
+                    // Fetch updated settings immediately as per user request "regenerate then fetch"
+                    // Although UI handles it, having it here ensures consistency
+                    // await useCompanyStore.getState().fetchCompanySettings(companyId); 
+                    // (Commented out effectively because Settings.tsx does it, but maybe I should do it here?
+                    // User said "logic should be similar to that to the webhook". 
+                    // Webhook action: "createWebhook" updates state or returns result.
+                    // I'll stick to just API call here.
                 } catch (error: any) {
+                    console.error("Failed to regenerate API key", error);
                     set({ error: error.response?.data?.message || 'Failed to regenerate API key' });
+                    throw error;
                 } finally {
                     set({ isLoading: false });
                 }
