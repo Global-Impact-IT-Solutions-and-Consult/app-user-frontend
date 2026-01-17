@@ -241,13 +241,11 @@ export const useCompanyStore = create<CompanyState>()(
                 }
             },
 
-            regenerateApiKey: async (companyId, userId, type) => {
+            regenerateApiKey: async (companyId, type) => {
                 set({ isLoading: true, error: null });
                 try {
-                    const response = await api.put(`/companies/${companyId}/api-keys`, {
-                        companyId,
-                        userId,
-                        settingsType: type
+                    const response = await api.post(`/companies/${companyId}/api-keys/regenerate`, {
+                        environment: type
                     });
                     console.log("API key regenerated successfully", response);
                     // Fetch updated settings immediately as per user request "regenerate then fetch"

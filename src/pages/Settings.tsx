@@ -25,6 +25,8 @@ import { useLogStore } from "../store/logStore";
 import { useAuthStore } from "../store/authStore";
 import { useToast } from "../components/ui/Toast";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
+import { MfaSetupModal } from "../components/MfaSetupModal";
+import { DisableMfaModal } from "../components/DisableMfaModal";
 
 const tabs = [
     { label: "General", id: "general" },
@@ -199,7 +201,7 @@ const ApiTab = () => {
             const setting = companySettings?.settings.find(s => s.id === regenerateKeyId);
             if (setting && (setting.type === 'live' || setting.type === 'test')) {
                 try {
-                    await regenerateApiKey(currentCompany.id, user.id, setting.type);
+                    await regenerateApiKey(currentCompany.id, setting.type);
                     toast({ title: "Key Regenerated", description: "API Key has been regenerated successfully.", variant: "success" });
                     fetchCompanySettings(currentCompany.id);
                 } catch (e) {
@@ -445,85 +447,90 @@ const ApiTab = () => {
     );
 };
 
-const SecurityTab = () => (
-    <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <header className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-primary-50 flex items-center justify-center text-primary-500 shadow-sm">
-                <Shield className="h-6 w-6" />
-            </div>
-            <div>
-                <h2 className="text-xl font-bold text-surface-900 font-serif">Security Settings</h2>
-                <p className="text-surface-900/70 text-sm">Manage authentication and security preferences</p>
-            </div>
-        </header>
+const SecurityTab = () => {
+    const { user } = useAuthStore();
+    const [isMfaSetupOpen, setIsMfaSetupOpen] = React.useState(false);
+    const [isDisableOpen, setIsDisableOpen] = React.useState(false);
 
-        <section className="space-y-8">
-            <div className="space-y-4">
-                <h3 className="text-sm font-bold text-surface-900">Multi-Factor Authentication</h3>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-surface-100 bg-white">
-                    <div className="space-y-1">
-                        <p className="text-sm font-bold text-surface-900">MFA Required</p>
-                        <p className="text-xs text-surface-900/70">Require MFA for all user logins (NITDA Mandate)</p>
-                    </div>
-                    <Toggle defaultChecked={true} />
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-primary-600 font-medium">
-                    <Info className="h-3.5 w-3.5" />
-                    MFA is mandated by Section 21.i of the NITDA Guideline
-                </div>
-                <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-surface-900">Default MFA Method</label>
-                    <Select>
-                        <option>Email Verification</option>
-                        <option>SMS Authenticator</option>
-                        <option>Google Authenticator</option>
-                    </Select>
-                </div>
-            </div>
+    const handleDisableMfa = async () => {
+        setIsDisableOpen(true);
+    };
 
-            <div className="space-y-4 pt-4 border-t border-surface-100">
-                <h3 className="text-sm font-bold text-surface-900">Session Management</h3>
-                <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-surface-900">Session Timeout</label>
-                    <Select>
-                        <option>1 hour</option>
-                        <option>2 hours</option>
-                        <option>4 hours</option>
-                        <option>8 hours</option>
-                    </Select>
-                    <div className="flex items-center gap-2 text-[11px] text-primary-600 font-medium mt-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        After this period of inactivity, users will be automatically logged out
+    return (
+        <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <header className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-primary-50 flex items-center justify-center text-primary-500 shadow-sm">
+                    <Shield className="h-6 w-6" />
+                </div>
+                <div>
+                    <h2 className="text-xl font-bold text-surface-900 font-serif">Security Settings</h2>
+                    <p className="text-surface-900/70 text-sm">Manage authentication and security preferences</p>
+                </div>
+            </header>
+
+            <section className="space-y-8">
+                {/* Personal Security */}
+                <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-surface-900 border-b border-surface-100 pb-2">Your Security</h3>
+                    <div className="flex items-center justify-between p-6 rounded-xl border border-surface-200 bg-surface-50">
+                        <div className="flex items-center gap-4">
+                            <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", user?.isMfaEnabled ? "bg-success-100 text-success-600" : "bg-surface-200 text-surface-500")}>
+                                <Shield className="h-5 w-5" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-sm font-bold text-surface-900">Two-Factor Authentication</p>
+                                <p className="text-xs text-surface-600">
+                                    {user?.isMfaEnabled
+                                        ? "Your account is secured with 2FA."
+                                        : "Add an extra layer of security to your account."}
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            variant={user?.isMfaEnabled ? "outline" : "primary"}
+                            onClick={() => user?.isMfaEnabled ? handleDisableMfa() : setIsMfaSetupOpen(true)}
+                        >
+                            {user?.isMfaEnabled ? "Disable 2FA" : "Enable 2FA"}
+                        </Button>
                     </div>
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-surface-100 bg-surface-50">
-                    <div className="space-y-1">
-                        <p className="text-sm font-bold text-surface-900 text-surface-500">Single Session per User</p>
-                        <p className="text-xs text-surface-900/70">Allow only one active session per user account</p>
-                    </div>
-                    <Toggle defaultChecked={false} />
-                </div>
-            </div>
 
-            <div className="space-y-4 pt-4 border-t border-surface-100">
-                <h3 className="text-sm font-bold text-surface-900">Password</h3>
-                <div className="grid grid-cols-1 gap-6">
+                {/* Company Policy (Visual Only) */}
+                <div className="space-y-4 pt-4">
+                    <h3 className="text-sm font-bold text-surface-900 border-b border-surface-100 pb-2">Company Policy</h3>
+                    <div className="flex items-center justify-between p-4 rounded-xl border border-surface-100 bg-white opacity-70">
+                        <div>
+                            <p className="text-sm font-bold text-surface-900">Enforce MFA for all users</p>
+                            <p className="text-xs text-surface-900/70">NITDA Mandate Requirement</p>
+                        </div>
+                        <Toggle defaultChecked={true} disabled />
+                    </div>
+                </div>
+
+                {/* Session Management */}
+                <div className="space-y-4 pt-4 border-t border-surface-100">
+                    <h3 className="text-sm font-bold text-surface-900">Session Management</h3>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-surface-900">New Password</label>
-                        <Input type="password" defaultValue="***********" />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-surface-900">Confirm New Password</label>
-                        <Input type="password" defaultValue="***********" />
+                        <label className="text-xs font-bold text-surface-900">Session Timeout</label>
+                        <Select>
+                            <option>1 hour</option>
+                            <option>2 hours</option>
+                            <option>4 hours</option>
+                            <option>8 hours</option>
+                        </Select>
+                        <div className="flex items-center gap-2 text-[11px] text-primary-600 font-medium mt-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            After this period of inactivity, users will be automatically logged out
+                        </div>
                     </div>
                 </div>
-                <Button variant="outline" className="h-10 px-6 font-bold text-primary-500 border-primary-100 hover:bg-primary-50 transition-all">
-                    Update Password
-                </Button>
-            </div>
-        </section>
-    </div>
-);
+            </section>
+
+            <MfaSetupModal isOpen={isMfaSetupOpen} onClose={() => setIsMfaSetupOpen(false)} />
+            <DisableMfaModal isOpen={isDisableOpen} onClose={() => setIsDisableOpen(false)} />
+        </div>
+    );
+};
 
 const AddUserModal = ({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd?: (user: any) => void }) => {
     if (!isOpen) return null;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompanyStore } from "../store/companyStore";
 import { Button } from "../components/ui/Button";
@@ -21,12 +21,14 @@ import {
     Link2
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useAuthStore } from "../store/authStore";
+import { Smartphone } from "lucide-react";
 
 export default function OnboardingFlow() {
     const navigate = useNavigate();
     const { createCompany, isLoading, error } = useCompanyStore();
     const [step, setStep] = useState(1);
-    const totalSteps = 2; // Reduced steps: 1. Company, 2. API/Done
+    const totalSteps = 3; // 1. Company, 2. Security, 3. API/Done
 
     // Shared state for company form
     const [companyData, setCompanyData] = useState({
@@ -82,11 +84,14 @@ export default function OnboardingFlow() {
                     <div className="p-10 pb-6 border-b border-surface-100 flex justify-between items-start">
                         <div className="space-y-2">
                             <h1 className="text-3xl font-bold font-serif text-surface-900 tracking-tight">
-                                {step === 1 ? "Onboard Your Company" : "Setup Complete"}
+                                {step === 1 && "Onboard Your Company"}
+                                {step === 2 && "Secure Your Account"}
+                                {step === 3 && "Setup Complete"}
                             </h1>
                             <p className="text-surface-500 font-medium">
                                 {step === 1 && "Complete your business profile to generate your unique Business ID and begin using the e-invoicing network."}
-                                {step === 2 && "You are ready to start exchanging invoices."}
+                                {step === 2 && "Configure Multi-Factor Authentication (MFA) to protect your account."}
+                                {step === 3 && "You are ready to start exchanging invoices."}
                             </p>
                         </div>
                         <div className="text-surface-400 font-bold text-sm bg-surface-50 px-3 py-1.5 rounded-full">
@@ -97,7 +102,7 @@ export default function OnboardingFlow() {
                     {/* Progress Bar */}
                     <div className="px-10 py-6 bg-surface-50/50">
                         <div className="flex gap-4">
-                            {[1, 2].map(i => (
+                            {[1, 2, 3].map(i => (
                                 <div
                                     key={i}
                                     className={cn(
@@ -109,7 +114,8 @@ export default function OnboardingFlow() {
                         </div>
                         <div className="flex justify-between mt-4 text-[10px] font-bold uppercase tracking-wider text-primary-500">
                             <span className={cn(step === 1 ? "opacity-100" : "opacity-0 hidden")}>Company Info</span>
-                            <span className={cn(step === 2 ? "opacity-100" : "opacity-0 hidden")}>Finish</span>
+                            <span className={cn(step === 2 ? "opacity-100" : "opacity-0 hidden")}>MFA</span>
+                            <span className={cn(step === 3 ? "opacity-100" : "opacity-0 hidden")}>API Setup</span>
                         </div>
                     </div>
 
@@ -127,7 +133,8 @@ export default function OnboardingFlow() {
                                 updateData={updateCompanyData}
                             />
                         )}
-                        {step === 2 && <APISetupStep />}
+                        {step === 2 && <SecurityStep onComplete={nextStep} />}
+                        {step === 3 && <APISetupStep />}
                     </div>
 
                     {/* Footer Controls */}
@@ -145,10 +152,29 @@ export default function OnboardingFlow() {
                             <Button onClick={handleCreateCompany} disabled={isLoading} className="px-10 h-12 gap-2 text-base">
                                 {isLoading ? "Creating..." : "Create Company"} <ArrowRight className="h-4 w-4" />
                             </Button>
-                        ) : (
+                        ) : step === 3 ? (
                             <Button onClick={handleComplete} className="px-10 h-12 gap-2 text-base">
                                 Go to Dashboard <ArrowRight className="h-4 w-4" />
                             </Button>
+                        ) : (
+                            // Step 2 is handled inside SecurityStep usually, or we control 'Next' here?
+                            // SecurityStep has its own interaction (Verify).
+                            // We might want to hide the footer 'Next' for step 2 IF the step drives it?
+                            // Or providing a 'Skip' / 'Continue' button here?
+                            // Let's pass 'onComplete' to SecurityStep and handle 'Next' via that or a skip button.
+                            // But the footer container is generic.
+                            // Let's make "Continue" button visible but maybe "Skip" styled?
+                            // Actually, let's keep the footer simple:
+                            // If Step 2, show "Skip for now" (variant ghost) and "Continue" (disabled if not verified?)
+                            // Or just rely on SecurityStep's internal buttons and hide generic footer?
+                            // Let's hide the generic "Right" button for Step 2 and let SecurityStep Render its own controls if needed?
+                            // OR better: Just render "Skip" and "Next" here.
+                            <div className="flex gap-4">
+                                <Button variant="ghost" onClick={nextStep} className="text-surface-500 hover:text-surface-900">Skip for now</Button>
+                                {/* Continue button logic might need to adhere to MFA state. 
+                                    For now, simple flow. 
+                                */}
+                            </div>
                         )}
                     </div>
                 </Card>
@@ -189,7 +215,7 @@ function CompanyInfoStep({ data, updateData }: { data: any, updateData: (f: stri
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium text-surface-900 ml-0.5">Business Type</label>
                             <select
-                                className="flex h-11 w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 italic text-surface-400"
+                                className="flex h-11 w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-surface-900"
                                 value={data.businessType}
                                 onChange={(e) => updateData("businessType", e.target.value)}
                             >
@@ -395,14 +421,10 @@ function APISetupStep() {
                     </Card>
 
                     <Card
-                        className={cn(
-                            "p-6 cursor-pointer transition-all border-2",
-                            env === "live" ? "border-primary-500 bg-primary-50/10" : "border-surface-200 bg-white opacity-60"
-                        )}
-                        onClick={() => setEnv("live")}
+                        className="p-6 border-2 border-surface-200 bg-surface-50 opacity-50 cursor-not-allowed"
                     >
                         <div className="space-y-4">
-                            <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center", env === "live" ? "bg-primary-500 text-white" : "bg-surface-100 text-surface-400")}>
+                            <div className="h-12 w-12 rounded-xl flex items-center justify-center bg-surface-100 text-surface-400">
                                 <Building2 className="h-6 w-6" />
                             </div>
                             <div className="space-y-2">
@@ -410,7 +432,7 @@ function APISetupStep() {
                                 <p className="text-xs text-surface-500 leading-relaxed">
                                     Connect to production NRS for real transactions. Requires official certification and live credentials.
                                 </p>
-                                <Badge variant="success" className="bg-success-100 text-success-700 border-none font-bold">Production ready</Badge>
+                                <Badge variant="gray" className="bg-surface-200 text-surface-500 border-none font-bold">Coming Soon</Badge>
                             </div>
                         </div>
                     </Card>
@@ -513,6 +535,208 @@ function APISetupStep() {
                     </div>
                 </div>
             </div>
+        </div>
+    );
+}
+
+function SecurityStep({ onComplete }: { onComplete: () => void }) {
+    const { setupMfa, enableMfa } = useAuthStore();
+    const [method, setMethod] = useState<'app' | 'email'>('app');
+    const [step, setStep] = useState<'selection' | 'setup' | 'verify' | 'success'>('selection');
+
+    // Setup state
+    const [qrCode, setQrCode] = useState("");
+    const [secret, setSecret] = useState("");
+    const [entryKey, setEntryKey] = useState("");
+
+    // Verify state
+    const [otp, setOtp] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleMethodSelect = (m: 'app' | 'email') => {
+        setMethod(m);
+    };
+
+    const initSetup = useCallback(async () => {
+        setStep('setup');
+        setError(null);
+        try {
+            const data = await setupMfa();
+            setQrCode(data.qrCode);
+            setSecret(data.secret);
+            setEntryKey(data.manualEntryKey);
+        } catch (e) {
+            setError("Failed to initialize MFA setup. Please try again.");
+        }
+    }, [setupMfa]);
+
+    useEffect(() => {
+        if (method === 'app') {
+            initSetup();
+        }
+    }, [method, initSetup]);
+
+    const handleVerify = async () => {
+        if (!otp || otp.length !== 6) return;
+        setIsLoading(true);
+        setError(null);
+        try {
+            await enableMfa(otp, secret);
+            setStep('success');
+            setTimeout(() => {
+                onComplete();
+            }, 1000);
+        } catch (e) {
+            setError("Invalid verification code. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="space-y-8">
+            <div className="space-y-2">
+                <h3 className="text-xl font-bold text-surface-900">Please select your preferred method.</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div
+                    className={cn(
+                        "p-6 rounded-xl border-2 cursor-pointer transition-all space-y-4",
+                        method === 'app' ? "border-primary-500 bg-primary-50/10" : "border-surface-200 bg-white hover:border-surface-300"
+                    )}
+                    onClick={() => handleMethodSelect('app')}
+                >
+                    <div className="flex items-start gap-4">
+                        <div className="h-10 w-10 bg-primary-500 rounded-lg flex items-center justify-center text-white shrink-0">
+                            <Smartphone className="h-6 w-6" />
+                        </div>
+                        <div className="space-y-1">
+                            <h4 className="font-bold text-surface-900">Authenticator App (Recommended)</h4>
+                            <p className="text-xs text-surface-500 leading-relaxed">
+                                Use apps like Google Authenticator, Microsoft Authenticator, or Authy. Provides the highest level of security.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    className={cn(
+                        "p-6 rounded-xl border-2 cursor-pointer transition-all space-y-4",
+                        method === 'email' ? "border-primary-500 bg-primary-50/10" : "border-surface-200 bg-white hover:border-surface-300"
+                    )}
+                    onClick={() => handleMethodSelect('email')}
+                >
+                    <div className="flex items-start gap-4">
+                        <div className="h-10 w-10 bg-surface-100 rounded-lg flex items-center justify-center text-surface-500 shrink-0">
+                            <Mail className="h-6 w-6" />
+                        </div>
+                        <div className="space-y-1">
+                            <h4 className="font-bold text-surface-900">Email Verification</h4>
+                            <p className="text-xs text-surface-500 leading-relaxed">
+                                Receive a verification code via email each time you sign in.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {method === 'app' && (
+                <div className="bg-surface-50 rounded-xl p-8 animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex flex-col md:flex-row gap-12">
+                        {/* Instructions */}
+                        <div className="flex-1 space-y-6">
+                            <div className="bg-primary-50 px-4 py-3 rounded-lg">
+                                <h4 className="font-bold text-surface-900 text-sm">Step by Step Guide</h4>
+                            </div>
+                            <ol className="space-y-5">
+                                <li className="flex gap-4 text-sm text-surface-600 items-start">
+                                    <span className="h-6 w-6 bg-white border border-surface-200 rounded-full flex items-center justify-center text-[10px] font-bold text-surface-700 shrink-0 shadow-sm mt-0.5">1</span>
+                                    <span className="leading-tight pt-1">Install Google authenticator app on your phone.</span>
+                                </li>
+                                <li className="flex gap-4 text-sm text-surface-600 items-start">
+                                    <span className="h-6 w-6 bg-white border border-surface-200 rounded-full flex items-center justify-center text-[10px] font-bold text-surface-700 shrink-0 shadow-sm mt-0.5">2</span>
+                                    <span className="leading-tight pt-1">Tap the "+" button to add a new account.</span>
+                                </li>
+                                <li className="flex gap-4 text-sm text-surface-600 items-start">
+                                    <span className="h-6 w-6 bg-white border border-surface-200 rounded-full flex items-center justify-center text-[10px] font-bold text-surface-700 shrink-0 shadow-sm mt-0.5">3</span>
+                                    <span className="leading-tight pt-1">Scan the QR code with your phone's camera.</span>
+                                </li>
+                                <li className="flex gap-4 text-sm text-surface-600 items-start">
+                                    <span className="h-6 w-6 bg-white border border-surface-200 rounded-full flex items-center justify-center text-[10px] font-bold text-surface-700 shrink-0 shadow-sm mt-0.5">4</span>
+                                    <span className="leading-tight pt-1">Enter the 6-digit code generated by the app below to verify.</span>
+                                </li>
+                            </ol>
+
+                            <div className="space-y-2 pt-4">
+                                <label className="text-xs font-bold text-surface-900 uppercase tracking-wider">Verification Code</label>
+                                <div className="flex gap-3">
+                                    <Input
+                                        placeholder="000 000"
+                                        className="font-mono tracking-[0.2em] text-center text-lg h-12 w-48 bg-white border-surface-300 focus:border-primary-500 focus:ring-primary-500"
+                                        value={otp}
+                                        onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                                    />
+                                    <Button
+                                        onClick={handleVerify}
+                                        disabled={otp.length !== 6 || isLoading}
+                                        className={cn("px-8 h-12 font-bold", step === 'success' ? "bg-success-500 hover:bg-success-600" : "")}
+                                    >
+                                        {isLoading ? "Verifying..." : step === 'success' ? "Verified" : "Verify"}
+                                    </Button>
+                                </div>
+                                {error && <p className="text-xs text-red-500 font-bold flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500 inline-block" />{error}</p>}
+                            </div>
+
+                            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mt-6">
+                                <p className="text-xs text-blue-800 leading-relaxed">
+                                    <span className="font-bold">Note:</span> Your selection can be changed later in your account security settings. We strongly recommend using an Authenticator App for optimal protection of your e-invoicing data.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* QR Code */}
+                        <div className="flex flex-col items-center gap-6 pt-4">
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-surface-200">
+                                {qrCode ? (
+                                    <img src={qrCode} alt="MFA QR Code" className="h-44 w-44" />
+                                ) : (
+                                    <div className="h-44 w-44 flex items-center justify-center bg-surface-50 text-surface-400 text-xs text-center p-4 rounded-xl border border-dashed border-surface-200">
+                                        Loading QR code...
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-surface-100 py-3 px-4 rounded-lg text-center space-y-1 max-w-[200px]">
+                                <p className="text-[10px] uppercase font-bold text-surface-400 tracking-wider">Manual Entry Key</p>
+                                <p className="text-xs font-mono font-medium text-surface-600 break-all select-all cursor-text text-center">
+                                    {entryKey || "Loading..."}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {method === 'email' && (
+                <div className="bg-surface-50 rounded-xl p-10 animate-in slide-in-from-top-2 duration-300 border border-surface-200 text-center space-y-6">
+                    <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center text-primary-500 mx-auto shadow-sm">
+                        <Mail className="h-8 w-8" />
+                    </div>
+                    <div className="space-y-2 max-w-md mx-auto">
+                        <h4 className="text-lg font-bold text-surface-900">Email Verification is Active</h4>
+                        <p className="text-sm text-surface-600 leading-relaxed">
+                            Your account is currently protected by email verification. We will send a one-time code to <b>{useAuthStore.getState().user?.email}</b> whenever a new login is detected.
+                        </p>
+                    </div>
+                    <div className="pt-2">
+                        <Button onClick={onComplete} className="px-8 min-w-[200px]">
+                            Continue with Email Verification
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

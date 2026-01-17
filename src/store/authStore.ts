@@ -11,6 +11,7 @@ interface User {
     currentEnvironment?: 'test' | 'live';
     currentCompanyId?: string;
     isEmailVerified?: boolean;
+    isMfaEnabled?: boolean;
 }
 
 interface DecodedToken {
@@ -27,13 +28,17 @@ interface AuthState {
     userId: string | null;    // For MFA verification flow
     isAuthenticated: boolean;
     requiresMfa: boolean;
+    tempMfaEnabled?: boolean;
 
     // Actions
     signup: (data: any) => Promise<void>;
     login: (data: any) => Promise<any>;
     verifyMfa: (code: string) => Promise<void>;
     resendOtp: () => Promise<void>;
-    logout: () => void;
+    fetchUser: () => Promise<void>;
+    setupMfa: () => Promise<{ qrCode: string; secret: string; manualEntryKey: string }>;
+    enableMfa: (code: string, secret: string) => Promise<void>;
+    disableMfa: (code: string) => Promise<void>;
     setEnvironment: (env: 'test' | 'live') => Promise<void>;
 }
 
@@ -46,13 +51,12 @@ export const useAuthStore = create<AuthState>()(
             userId: null,
             isAuthenticated: false,
             requiresMfa: false,
+            tempMfaEnabled: false,
 
             signup: async (data) => {
                 try {
                     const response = await api.post('/auth/signup', data);
                     console.log("Signup response:", response);
-                    // Handle potential nested data structure (NestJS common pattern)
-                    // Try data.data first, then fallback to data
                     const result = response.data.data || response.data;
                     const { userId, tempToken, requiresMfa } = result;
 
@@ -71,30 +75,41 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     const response = await api.post('/auth/login', data);
                     console.log("Login response:", response.data.data);
-                    // Handle nested data structure: { data: { statusCode: 200, data: { ... } } }
                     const result = response.data.data
-                    const { requiresMfa, tempToken, message } = result;
+                    // Check if direct login (no MFA) or MFA required
+                    const { requiresMfa, tempToken, message, accessToken, user, totpEnabled } = result;
 
-                    let userId = result.userId;
-
-                    // If userId is not directly in response, try to extract from tempToken
-                    if (!userId && tempToken) {
-                        try {
-                            const decoded = jwtDecode<DecodedToken>(tempToken);
-                            console.log(decoded);
-                            userId = decoded.userId;
-                        } catch (e) {
-                            console.error("Failed to decode tempToken", e);
+                    if (accessToken && user) {
+                        // Direct login success
+                        set({
+                            isAuthenticated: true,
+                            accessToken,
+                            user,
+                            requiresMfa: false,
+                            tempToken: null,
+                            userId: user.id
+                        });
+                    } else {
+                        // MFA required flow or other intermediate state
+                        let userId = result.userId;
+                        if (!userId && tempToken) {
+                            try {
+                                const decoded = jwtDecode<DecodedToken>(tempToken);
+                                userId = decoded.userId;
+                            } catch (e) {
+                                console.error("Failed to decode tempToken", e);
+                            }
                         }
+
+                        set({
+                            tempToken,
+                            requiresMfa: !!requiresMfa,
+                            userId,
+                            tempMfaEnabled: !!totpEnabled,
+                        });
                     }
 
-                    set({
-                        tempToken,
-                        requiresMfa: !!requiresMfa,
-                        userId,
-                    });
-
-                    return {message}
+                    return { message }
                 } catch (error) {
                     console.error('Login failed:', error);
                     throw error;
@@ -118,8 +133,8 @@ export const useAuthStore = create<AuthState>()(
                     set({
                         isAuthenticated: true,
                         accessToken,
-                        user,
-                        tempToken: null, // Clear temp stuff
+                        user: { ...user, isMfaEnabled: user.isMfaEnabled ?? get().tempMfaEnabled },
+                        tempToken: null,
                         requiresMfa: false
                     });
                 } catch (error) {
@@ -143,6 +158,8 @@ export const useAuthStore = create<AuthState>()(
             },
 
             logout: () => {
+                console.log("Logging out...");
+                // Ideally call server logout if exists, but currently client-side only
                 set({
                     user: null,
                     accessToken: null,
@@ -153,18 +170,73 @@ export const useAuthStore = create<AuthState>()(
                 });
             },
 
-            setEnvironment: async (env) => {
+            setEnvironment: async (env: 'test' | 'live') => {
                 try {
                     const response = await api.post('/auth/switch-environment', { environment: env });
                     console.log("Switch environment successful", response);
                     const result = response.data.data || response.data;
                     const { accessToken, currentEnvironment, currentCompanyId } = result;
                     set(state => ({
-                        accessToken, // Token might be rotated
+                        accessToken,
                         user: state.user ? { ...state.user, currentEnvironment, currentCompanyId } : null
                     }));
                 } catch (error) {
                     console.error('Switch environment failed:', error);
+                    throw error;
+                }
+            },
+
+            fetchUser: async () => {
+                try {
+                    const response = await api.get('/auth/me');
+                    console.log("Fetch user response:", response.data);
+                    const userData = response.data.data || response.data;
+                    set({ user: userData });
+                } catch (error) {
+                    console.error('Fetch user failed:', error);
+                }
+            },
+
+            setupMfa: async () => {
+                try {
+                    const response = await api.get('/auth/mfa/setup');
+                    console.log("Setup MFA response:", response.data);
+                    return response.data.data || response.data;
+                } catch (error) {
+                    console.error('Setup MFA failed:', error);
+                    throw error;
+                }
+            },
+
+            enableMfa: async (code, secret) => {
+                try {
+                    await api.post('/auth/mfa/enable', { code, secret });
+                    console.log("Enable MFA successful");
+                    // Refresh user to update MFA status if backend updates profile
+                    const currentUser = get().user;
+                    if (currentUser) {
+                        set({
+                            user: { ...currentUser, isMfaEnabled: true }
+                        });
+                    }
+                } catch (error) {
+                    console.error('Enable MFA failed:', error);
+                    throw error;
+                }
+            },
+
+            disableMfa: async (code) => {
+                try {
+                    await api.post('/auth/mfa/disable', { code });
+                    console.log("Disable MFA successful");
+                    const currentUser = get().user;
+                    if (currentUser) {
+                        set({
+                            user: { ...currentUser, isMfaEnabled: false }
+                        });
+                    }
+                } catch (error) {
+                    console.error('Disable MFA failed:', error);
                     throw error;
                 }
             }

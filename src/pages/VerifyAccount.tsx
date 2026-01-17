@@ -4,11 +4,12 @@ import { useAuthStore } from "../store/authStore";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { useCompanyStore } from "../store/companyStore";
+import { cn } from "../lib/utils";
 
 export default function VerifyAccount() {
     const navigate = useNavigate();
     const { verifyMfa, resendOtp } = useAuthStore();
-    const { fetchCompanies } = useCompanyStore();   
+    const { fetchCompanies } = useCompanyStore();
     const [timer, setTimer] = useState(179); // 02:59 in seconds
     const [otp, setOtp] = useState(["", "", "", "", "", ""]);
     const [isLoading, setIsLoading] = useState(false);
@@ -136,8 +137,21 @@ export default function VerifyAccount() {
                             </div>
                             <div className="relative flex justify-center text-sm">
                                 <div className="bg-white px-6 flex items-center gap-2">
-                                    <button onClick={handleResend} className="text-surface-400 font-medium hover:text-surface-600 transition-colors">Resend Security code</button>
-                                    <span className="text-surface-900 font-bold tabular-nums">{formatTime(timer)}</span>
+                                    <button
+                                        onClick={handleResend}
+                                        disabled={timer > 0}
+                                        className={cn(
+                                            "font-medium transition-all",
+                                            timer > 0
+                                                ? "text-surface-300 cursor-not-allowed"
+                                                : "text-primary-600 hover:text-primary-700 hover:underline cursor-pointer"
+                                        )}
+                                    >
+                                        Resend Security code
+                                    </button>
+                                    <span className={cn("text-surface-900 font-bold tabular-nums", timer === 0 && "opacity-50")}>
+                                        {formatTime(timer)}
+                                    </span>
                                 </div>
                             </div>
                         </div>
