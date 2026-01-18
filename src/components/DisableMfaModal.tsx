@@ -33,8 +33,8 @@ export const DisableMfaModal = ({ isOpen, onClose }: DisableMfaModalProps) => {
             await disableMfa(otp);
             toast({ title: "MFA Disabled", description: "Two-factor authentication has been turned off.", variant: "default" });
             onClose();
-        } catch (e) {
-            setError("Invalid verification code. Please try again.");
+        } catch {
+            setError("Failed to disable MFA. Please try again.");
             toast({ title: "Failed to Disable", description: "Could not verify code.", variant: "error" });
         } finally {
             setIsLoading(false);

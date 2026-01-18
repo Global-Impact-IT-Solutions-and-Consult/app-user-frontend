@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import api from '../lib/api';
 
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+        };
+    };
+}
+
 interface Log {
     id: string;
     timestamp: string;
@@ -8,7 +16,7 @@ interface Log {
     message: string;
     source: string; // e.g. "API", "Webhook", "System"
     category?: string; // e.g. "Auth", "Invoice"
-    metadata?: any;
+    metadata?: Record<string, unknown>;
     traceId?: string;
 }
 
@@ -19,7 +27,7 @@ interface LogState {
     error: string | null;
 
     // Actions
-    fetchLogs: (params?: any) => Promise<void>;
+    fetchLogs: (params?: Record<string, unknown>) => Promise<void>;
     clearLogs: () => Promise<void>;
 }
 
@@ -29,7 +37,7 @@ export const useLogStore = create<LogState>((set) => ({
     isLoading: false,
     error: null,
 
-    fetchLogs: async (params) => {
+    fetchLogs: async (params?: Record<string, unknown>) => {
         set({ isLoading: true, error: null });
         try {
             const response = await api.get('/logs', { params });
@@ -43,8 +51,8 @@ export const useLogStore = create<LogState>((set) => ({
                     totalLogs: result.total || (result.logs ? result.logs.length : 0)
                 });
             }
-        } catch (error: any) {
-            set({ error: error.response?.data?.message || 'Failed to fetch logs' });
+        } catch (error) {
+            set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch logs' });
         } finally {
             set({ isLoading: false });
         }
@@ -55,7 +63,7 @@ export const useLogStore = create<LogState>((set) => ({
         try {
             // await api.delete('/logs'); // Uncomment if delete endpoint exists
             set({ logs: [], totalLogs: 0 });
-        } catch (error: any) {
+        } catch (error) {
             console.error("Failed to clear logs", error);
         }
     }

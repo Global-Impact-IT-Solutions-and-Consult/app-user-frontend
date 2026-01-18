@@ -52,20 +52,14 @@ export default function OnboardingFlow() {
 
     const handleCreateCompany = async () => {
         try {
-            // Mapping form data to API expected DTO if needed
-            // API expects: name, legalName, taxId (and maybe others?)
-            // Check docs: CreateCompanyDto -> name, legalName, taxId.
-            // We pass what we have. API might be loose or strict.
             await createCompany({
                 name: companyData.name,
                 legalName: companyData.legalName,
                 taxId: companyData.taxId,
-                // Pass other fields if API supports them, otherwise they are for UI demo?
-                // Assuming minimal MVP for now based on strict backend reqs
             });
             nextStep(); // Move to success/next step
-        } catch (e) {
-            console.error(e);
+        } catch {
+            // console.error(_e);
         }
     };
 
@@ -157,23 +151,8 @@ export default function OnboardingFlow() {
                                 Go to Dashboard <ArrowRight className="h-4 w-4" />
                             </Button>
                         ) : (
-                            // Step 2 is handled inside SecurityStep usually, or we control 'Next' here?
-                            // SecurityStep has its own interaction (Verify).
-                            // We might want to hide the footer 'Next' for step 2 IF the step drives it?
-                            // Or providing a 'Skip' / 'Continue' button here?
-                            // Let's pass 'onComplete' to SecurityStep and handle 'Next' via that or a skip button.
-                            // But the footer container is generic.
-                            // Let's make "Continue" button visible but maybe "Skip" styled?
-                            // Actually, let's keep the footer simple:
-                            // If Step 2, show "Skip for now" (variant ghost) and "Continue" (disabled if not verified?)
-                            // Or just rely on SecurityStep's internal buttons and hide generic footer?
-                            // Let's hide the generic "Right" button for Step 2 and let SecurityStep Render its own controls if needed?
-                            // OR better: Just render "Skip" and "Next" here.
                             <div className="flex gap-4">
                                 <Button variant="ghost" onClick={nextStep} className="text-surface-500 hover:text-surface-900">Skip for now</Button>
-                                {/* Continue button logic might need to adhere to MFA state. 
-                                    For now, simple flow. 
-                                */}
                             </div>
                         )}
                     </div>
@@ -184,7 +163,19 @@ export default function OnboardingFlow() {
     );
 }
 
-function CompanyInfoStep({ data, updateData }: { data: any, updateData: (f: string, v: string) => void }) {
+function CompanyInfoStep({ data, updateData }: {
+    data: {
+        legalName: string;
+        name: string;
+        businessType: string;
+        taxId: string;
+        streetAddress: string;
+        primaryPhone: string;
+        contactPerson: string;
+        contactEmail: string;
+        industry: string;
+    }, updateData: (f: string, v: string) => void
+}) {
     return (
         <div className="space-y-12">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -292,7 +283,7 @@ function CompanyInfoStep({ data, updateData }: { data: any, updateData: (f: stri
 
 function APISetupStep() {
     const [env, setEnv] = useState<"test" | "live">("test");
-    const { currentCompany, fetchWebhooks, createWebhook, updateWebhook, webhooks, isLoading } = useCompanyStore();
+    const { currentCompany, companySettings, fetchWebhooks, createWebhook, updateWebhook, webhooks, isLoading, regenerateApiKey } = useCompanyStore();
     const [showKey, setShowKey] = useState(false);
     const [apiKeyCopied, setApiKeyCopied] = useState(false);
     const [webhookCopied, setWebhookCopied] = useState(false);
@@ -306,31 +297,23 @@ function APISetupStep() {
     }, [currentCompany?.id, fetchWebhooks]);
 
     // Find settings for the selected environment
-    const currentSettings = currentCompany?.companySettings?.[0]?.settings?.find(s => s.type === env);
+    const currentSettings = companySettings?.settings?.find(s => s.type === env);
     const apiKey = currentSettings?.publicKey;
 
-    // Find active webhook for current env
-    // Note: API response doesn't explicitly return 'environment' field in the snippet, 
-    // but based on previous context we assume we filter by what we know or if provided.
-    // If the API doesn't return environment, we might need to rely on the user's current view 
-    // or previous assumptions. The standard seems to be one webhook per env?
-    // Let's assume we filter by what we have.
+    // Filter for active webhooks in the current environment
     const activeWebhook = webhooks.find(w => w.environment === env && w.isActive);
-    // Warning: If webhooks list mixes environments and the object doesn't have it, 
-    // we might show wrong one. Assuming for now the list is relevant or we filtered on fetch?
-    // The previous fetch was `/companies/${id}/webhooks`, likely returns all.
-    // If response misses environment, we check if url matches or something?
-    // Let's stick to previous logical assumption or check if the user object has it.
 
+    // Prefill webhook URL when active webhook changes or env switches
     // Prefill webhook URL when active webhook changes or env switches
     useEffect(() => {
         if (activeWebhook) {
+            // eslint-disable-next-line
             setWebhookUrl(activeWebhook.url);
         } else {
+
             setWebhookUrl("");
         }
-    }, [activeWebhook, env]);
-
+    }, [activeWebhook]);
     const copyApiKey = () => {
         if (apiKey) {
             navigator.clipboard.writeText(apiKey);
@@ -347,6 +330,14 @@ function APISetupStep() {
         }
     };
 
+    const generateKey = async () => {
+        if (currentCompany?.id) {
+            await regenerateApiKey(currentCompany.id, 'test');
+            setShowKey(true);
+            setTimeout(() => setShowKey(false), 2000);
+        }
+    };
+
     const handleWebhookSubmit = async () => {
         if (!currentCompany?.id || !webhookUrl) return;
         try {
@@ -359,30 +350,14 @@ function APISetupStep() {
                     isActive: true
                 });
             } else {
-                // Create new
-                // Implementation in store needs to return the result for us to get the secret
-                // We'll trust the store pushes to 'webhooks' state, but we need the return value for the secret.
-                // We might need to tweak store to return the data.
-                // Or we capture it from the updated webhooks list if it persists there (unlikely for secret).
-
-                // Let's update this call to assume createWebhook now returns the data
-                // We need to modify store for that, but JS implies async returns promise result if returned.
-                // In store: `set(state => ...);` doesn't explicitly return.
-                // I will need to update store to return the result.
-
-                // For now, let's assume we will get it.
-                // Using a direct API call here might be cleaner if store doesn't return, 
-                // but let's fix the store.
-                const response = await createWebhook(currentCompany.id, {
+                const result = await createWebhook(currentCompany.id, {
                     url: webhookUrl,
                     environment: env,
                     events: ["receipt.created", "receipt.paid"],
                 });
-                // @ts-ignore
-                if (response && response.signingSecret) {
-                    // @ts-ignore
-                    setNewWebhookSecret(response.signingSecret);
-                }
+                setNewWebhookSecret(result.signingSecret || null);
+                setWebhookUrl(result.url);
+                setWebhookCopied(false);
             }
             // Ideally show success toast here
         } catch (e) {
@@ -453,26 +428,32 @@ function APISetupStep() {
                         </span>
                     </div>
                     <div className="flex gap-4">
-                        {apiKey && (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="bg-white gap-2 text-primary-500 border-surface-200"
-                                    onClick={() => setShowKey(!showKey)}
+                        <>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="bg-white gap-2 text-primary-500 border-surface-200"
+                                onClick={() => generateKey()}
                                 >
-                                    <Eye className="h-3.5 w-3.5" /> {showKey ? "Hide Key" : "Show Key"}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="bg-white gap-2 text-primary-500 border-surface-200"
-                                    onClick={copyApiKey}
-                                >
-                                    {apiKeyCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {apiKeyCopied ? "Copied" : "Copy"}
-                                </Button>
-                            </>
-                        )}
+                                Generate Key
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="bg-white gap-2 text-primary-500 border-surface-200"
+                                onClick={() => setShowKey(!showKey)}
+                            >
+                                <Eye className="h-3.5 w-3.5" /> {showKey ? "Hide Key" : "Show Key"}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="bg-white gap-2 text-primary-500 border-surface-200"
+                                onClick={copyApiKey}
+                            >
+                                {apiKeyCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {apiKeyCopied ? "Copied" : "Copy"}
+                            </Button>
+                        </>
                     </div>
                 </div>
             </div>
@@ -566,7 +547,7 @@ function SecurityStep({ onComplete }: { onComplete: () => void }) {
             setQrCode(data.qrCode);
             setSecret(data.secret);
             setEntryKey(data.manualEntryKey);
-        } catch (e) {
+        } catch {
             setError("Failed to initialize MFA setup. Please try again.");
         }
     }, [setupMfa]);
@@ -587,7 +568,7 @@ function SecurityStep({ onComplete }: { onComplete: () => void }) {
             setTimeout(() => {
                 onComplete();
             }, 1000);
-        } catch (e) {
+        } catch {
             setError("Invalid verification code. Please try again.");
         } finally {
             setIsLoading(false);

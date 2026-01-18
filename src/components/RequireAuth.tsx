@@ -4,7 +4,7 @@ import { useCompanyStore } from "../store/companyStore";
 
 export default function RequireAuth() {
     const { isAuthenticated, accessToken } = useAuthStore();
-    const { currentCompany, companies } = useCompanyStore();
+    const { companies } = useCompanyStore();
     const location = useLocation();
 
     console.log("companies", companies);

@@ -44,10 +44,7 @@ const NavItem = ({ icon: Icon, label, to, end }: NavItemProps) => (
 export const Sidebar = () => {
     const navigate = useNavigate();
     const { logout, user, setEnvironment } = useAuthStore();
-    const { currentCompany, isLoading } = useCompanyStore(); // Assuming companyStore also has loading state matching env switch? Or I can use local loading.
-    // Actually authStore doesn't expose loading for setEnvironment directly unless I derived it, but I'll use a local state or just optimistic.
-    // Let's check authStore again. It doesn't have isLoading exposed for actions.
-    // I'll add local loading.
+    const { currentCompany, isLoading } = useCompanyStore();
 
     const handleLogout = () => {
         logout();

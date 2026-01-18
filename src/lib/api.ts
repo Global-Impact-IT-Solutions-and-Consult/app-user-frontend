@@ -11,8 +11,6 @@ const api = axios.create({
 // Add a request interceptor to attach the auth token
 api.interceptors.request.use(
     (config) => {
-        // We'll read from localStorage directly here to avoid circular dependency with store
-        // or we can just assume the store persists to localStorage
         const storage = localStorage.getItem('auth-storage');
         if (storage) {
             try {

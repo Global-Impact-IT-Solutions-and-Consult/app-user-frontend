@@ -1,10 +1,10 @@
+import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import {
     ArrowLeft,
     Upload,
-    Trash2,
     Send,
     FileJson,
     Download,

@@ -29,7 +29,8 @@ export default function Signup() {
         try {
             await signup(formData);
             navigate("/verify-account");
-        } catch (err: any) {
+        } catch (err) {
+            // @ts-expect-error - assuming standard error structure or simple message fallback
             setError(err.response?.data?.message || "Signup failed. Please try again.");
         } finally {
             setIsLoading(false);

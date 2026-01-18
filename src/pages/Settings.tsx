@@ -204,7 +204,7 @@ const ApiTab = () => {
                     await regenerateApiKey(currentCompany.id, setting.type);
                     toast({ title: "Key Regenerated", description: "API Key has been regenerated successfully.", variant: "success" });
                     fetchCompanySettings(currentCompany.id);
-                } catch (e) {
+                } catch {
                     toast({ title: "Regeneration Failed", variant: "error" });
                 }
             }
@@ -237,7 +237,7 @@ const ApiTab = () => {
                 }
                 toast({ title: "Webhook created", description: "New webhook endpoint has been registered.", variant: "success" });
             }
-        } catch (e) {
+        } catch {
             toast({ title: "Operation failed", description: "Failed to save webhook configuration.", variant: "error" });
         } finally {
             setIsSaving(false);
@@ -290,7 +290,7 @@ const ApiTab = () => {
                                             fetchCompanySettings(currentCompany.id);
                                             fetchWebhooks(currentCompany.id);
                                         }
-                                    } catch (e) {
+                                    } catch {
                                         toast({ title: "Switch Failed", variant: "error" });
                                     }
                                 }}
@@ -532,11 +532,11 @@ const SecurityTab = () => {
     );
 };
 
-const AddUserModal = ({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd?: (user: any) => void }) => {
+const AddUserModal = ({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd?: (user: Record<string, unknown>) => void }) => {
     if (!isOpen) return null;
 
     const handleAdd = () => {
-        // In a real app, capture form data. For now, mock it.
+        // For now, mock it.
         if (onAdd) {
             onAdd({
                 name: "New User",
@@ -590,7 +590,14 @@ const AddUserModal = ({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: ()
     );
 };
 
-const EditUserModal = ({ isOpen, onClose, user, onDeleteClick }: { isOpen: boolean; onClose: () => void; user: any; onDeleteClick: () => void }) => {
+interface SettingsUser {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+}
+
+const EditUserModal = ({ isOpen, onClose, user, onDeleteClick }: { isOpen: boolean; onClose: () => void; user: SettingsUser | null; onDeleteClick: () => void }) => {
     if (!isOpen || !user) return null;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -623,7 +630,7 @@ const EditUserModal = ({ isOpen, onClose, user, onDeleteClick }: { isOpen: boole
     );
 };
 
-const DeleteUserModal = ({ isOpen, onClose, user, onConfirm }: { isOpen: boolean; onClose: () => void; user: any; onConfirm: () => void }) => {
+const DeleteUserModal = ({ isOpen, onClose, user, onConfirm }: { isOpen: boolean; onClose: () => void; user: SettingsUser | null; onConfirm: () => void }) => {
     if (!isOpen || !user) return null;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -651,12 +658,13 @@ const UserManagementTab = () => {
     // Use members from store. If we want to edit locally, we'd copy to state, but for now display store.
 
     const [isAddOpen, setIsAddOpen] = React.useState(false);
-    const [editUser, setEditUser] = React.useState<any>(null);
-    const [deleteUser, setDeleteUser] = React.useState<any>(null);
+    const [editUser, setEditUser] = React.useState<SettingsUser | null>(null);
+    const [deleteUser, setDeleteUser] = React.useState<SettingsUser | null>(null);
     const { toast } = useToast();
 
     // Map company members to display format
     const users = currentCompany?.members?.map(m => ({
+        id: m.id,
         name: `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email.split('@')[0], // Fallback name
         email: m.email,
         role: m.roles && m.roles.length > 0 ? m.roles[0] : 'User',
@@ -751,7 +759,6 @@ const UserManagementTab = () => {
 
 const DangerZoneTab = () => {
     const { clearLogs } = useLogStore();
-    const { currentCompany } = useCompanyStore();
     const { toast } = useToast();
 
     const [clearLogsOpen, setClearLogsOpen] = React.useState(false);

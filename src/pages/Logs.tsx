@@ -27,7 +27,7 @@ const tabs = [
     { label: "Errors", id: "errors" },
 ];
 
-const StatCard = ({ icon: Icon, value, label, colorClass }: { icon: any, value: string, label: string, colorClass: string }) => (
+const StatCard = ({ icon: Icon, value, label, colorClass }: { icon: React.ElementType, value: string, label: string, colorClass: string }) => (
     <div className="bg-white p-6 rounded-2xl border border-surface-200 shadow-sm flex flex-col items-center justify-center text-center space-y-2">
         <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center mb-1", colorClass)}>
             <Icon className="h-5 w-5" />
@@ -50,8 +50,16 @@ export default function Logs() {
     const { toast } = useToast();
     const [clearLogsOpen, setClearLogsOpen] = React.useState(false);
 
+    interface LogParams {
+        page: number;
+        limit: number;
+        search?: string;
+        type?: string;
+        [key: string]: unknown;
+    }
+
     React.useEffect(() => {
-        const params: any = {
+        const params: LogParams = {
             page,
             limit
         };
@@ -269,7 +277,7 @@ export default function Logs() {
                                             {log.level === "info" && <CheckCircle2 className="h-4 w-4 text-primary-500 shrink-0" />}
                                             {log.level === "warning" && <AlertTriangle className="h-4 w-4 text-warning-500 shrink-0" />}
                                             {log.level === "error" && <XCircle className="h-4 w-4 text-danger-500 shrink-0" />}
-                                            <span className="text-surface-600 font-medium leading-relaxed">{log.message || log.metadata?.status}</span>
+                                            <span className="text-surface-600 font-medium leading-relaxed">{log.message || String(log.metadata?.status || '')}</span>
                                         </div>
                                     </td>
                                 </tr>

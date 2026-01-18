@@ -31,8 +31,8 @@ interface AuthState {
     tempMfaEnabled?: boolean;
 
     // Actions
-    signup: (data: any) => Promise<void>;
-    login: (data: any) => Promise<any>;
+    signup: (data: Record<string, unknown>) => Promise<void>;
+    login: (data: Record<string, unknown>) => Promise<Record<string, unknown>>;
     verifyMfa: (code: string) => Promise<void>;
     resendOtp: () => Promise<void>;
     fetchUser: () => Promise<void>;
@@ -53,7 +53,7 @@ export const useAuthStore = create<AuthState>()(
             requiresMfa: false,
             tempMfaEnabled: false,
 
-            signup: async (data) => {
+            signup: async (data: Record<string, unknown>) => {
                 try {
                     const response = await api.post('/auth/signup', data);
                     console.log("Signup response:", response);
@@ -71,7 +71,7 @@ export const useAuthStore = create<AuthState>()(
                 }
             },
 
-            login: async (data) => {
+            login: async (data: Record<string, unknown>) => {
                 try {
                     const response = await api.post('/auth/login', data);
                     console.log("Login response:", response.data.data);

@@ -35,24 +35,29 @@ export default function Invoices() {
         fetchReceipts
     } = useReceiptStore();
 
-    const [activeTab, setActiveTab] = React.useState("all"); // 'all', 'sent', 'received'
+    const [activeTab, setActiveTab] = React.useState("all");
     const [searchQuery, setSearchQuery] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState("All Statuses");
     const [dateRange, setDateRange] = React.useState("All Time");
     const [page, setPage] = React.useState(1);
     const limit = 20;
 
+    interface InvoiceParams {
+        page: number;
+        limit: number;
+        search?: string;
+        dateFrom?: string;
+        [key: string]: unknown;
+    }
+
     React.useEffect(() => {
-        const params: any = {
+        const params: InvoiceParams = {
             page,
             limit,
         };
 
         if (activeTab !== 'all') {
-            // Mapping tab to API filter if supported, or filtering client side if API doesn't support 'type'
-            // Assuming API might support 'type' or we rely on client side matching for now if API is strict regex
-            // But best practice is server side. Let's assume server supports type for Sent/Received
-            // params.type = activeTab; // Uncomment if API supports type filter
+            // Type filtering Logic
         }
 
         if (searchQuery) {
@@ -60,7 +65,7 @@ export default function Invoices() {
         }
 
         if (statusFilter !== "All Statuses") {
-            // params.status = statusFilter; // Uncomment if API supports status filter
+            // Status filtering Logic
         }
 
         if (dateRange !== "All Time") {
@@ -84,13 +89,12 @@ export default function Invoices() {
         setActiveTab("all");
     };
 
-    // Client-side filtering fallback for mock/dev environment if API doesn't fully support all filters yet
-    // In a real scenario, the API should handle this, but for smooth transition we can filter the 'receipts' array
+    // Client-side filtering fallback
     const displayedReceipts = React.useMemo(() => {
         return receipts.filter(r => {
             if (activeTab === 'sent' && r.type !== 'sent') return false;
             if (activeTab === 'received' && r.type !== 'received') return false;
-            if (activeTab === 'pending' && r.status !== 'processing') return false; // Example mapping
+            if (activeTab === 'pending' && r.status !== 'processing') return false;
             if (activeTab === 'failed' && r.status !== 'failed') return false;
 
             if (statusFilter !== "All Statuses" && r.status !== statusFilter) return false;

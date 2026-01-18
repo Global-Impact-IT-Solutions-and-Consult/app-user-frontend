@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import api from '../lib/api';
 
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+        };
+    };
+}
+
 interface Receipt {
     id: string;
     receiptNumber?: string; // or similar identifier
@@ -33,9 +41,9 @@ interface ReceiptState {
     error: string | null;
 
     // Actions
-    fetchReceipts: (params?: any) => Promise<void>;
+    fetchReceipts: (params?: Record<string, unknown>) => Promise<void>;
     fetchReceipt: (id: string) => Promise<void>;
-    fetchReceiptLogs: (id: string, params?: any) => Promise<void>;
+    fetchReceiptLogs: (id: string, params?: Record<string, unknown>) => Promise<void>;
     downloadReceipt: (id: string, format?: string) => Promise<void>;
 }
 
@@ -62,8 +70,8 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
                     totalReceipts: result.total || 0
                 });
             }
-        } catch (error: any) {
-            set({ error: error.response?.data?.message || 'Failed to fetch invoices' });
+        } catch (error) {
+            set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch receipts' });
         } finally {
             set({ isLoading: false });
         }
@@ -76,8 +84,8 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
             console.log(response);
             const result = response.data.data || response.data;
             set({ currentReceipt: result });
-        } catch (error: any) {
-            set({ error: error.response?.data?.message || 'Failed to fetch invoice details' });
+        } catch (error) {
+            set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch invoice details' });
         } finally {
             set({ isLoading: false });
         }
@@ -91,8 +99,9 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
             console.log(response);
             const result = response.data.data || response.data;
             set({ currentReceiptLogs: Array.isArray(result) ? result : (result.logs || []) });
-        } catch (error: any) {
+        } catch (error) {
             console.error("Failed to fetch receipt logs", error);
+            // set({ error: error.response?.data?.message || 'Failed to fetch receipt logs' });
         }
     },
 

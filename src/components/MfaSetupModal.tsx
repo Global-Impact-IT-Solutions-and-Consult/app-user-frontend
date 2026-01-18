@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { X, Copy, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { Button } from "./ui/Button";
@@ -22,6 +22,21 @@ export const MfaSetupModal = ({ isOpen, onClose }: MfaSetupModalProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const initSetup = useCallback(async () => {
+        setStep('loading');
+        setError(null);
+        try {
+            const data = await setupMfa();
+            setQrCode(data.qrCode);
+            setSecret(data.secret);
+            setEntryKey(data.manualEntryKey);
+            setStep('scan');
+        } catch {
+            setError("Failed to initialize MFA setup. Please try again.");
+            toast({ title: "Setup Failed", description: "Could not fetch MFA details.", variant: "error" });
+        }
+    }, [setupMfa, toast]);
+
     useEffect(() => {
         if (isOpen) {
             initSetup();
@@ -31,22 +46,7 @@ export const MfaSetupModal = ({ isOpen, onClose }: MfaSetupModalProps) => {
             setOtp("");
             setError(null);
         }
-    }, [isOpen]);
-
-    const initSetup = async () => {
-        setStep('loading');
-        setError(null);
-        try {
-            const data = await setupMfa();
-            setQrCode(data.qrCode);
-            setSecret(data.secret);
-            setEntryKey(data.manualEntryKey);
-            setStep('scan');
-        } catch (e) {
-            setError("Failed to initialize MFA setup. Please try again.");
-            toast({ title: "Setup Failed", description: "Could not fetch MFA details.", variant: "error" });
-        }
-    };
+    }, [isOpen, initSetup]);
 
     const handleVerify = async () => {
         if (!otp || otp.length !== 6) return;
@@ -59,7 +59,7 @@ export const MfaSetupModal = ({ isOpen, onClose }: MfaSetupModalProps) => {
             setTimeout(() => {
                 onClose();
             }, 2000);
-        } catch (e) {
+        } catch {
             setError("Invalid verification code. Please try again.");
             toast({ title: "Verification Failed", variant: "error" });
         } finally {

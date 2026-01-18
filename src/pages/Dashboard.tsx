@@ -26,13 +26,12 @@ export default function Dashboard() {
     const { logs, fetchLogs } = useLogStore();
 
     React.useEffect(() => {
-        // Fetch initial data for dashboard stats
-        fetchReceipts({ limit: 10, page: 1 }); // Get recent 10 for activity list
-        fetchLogs({ limit: 100, page: 1 }); // Get recent logs for error counting
+        fetchReceipts({ limit: 10, page: 1 });
+        fetchLogs({ limit: 100, page: 1 });
     }, [fetchReceipts, fetchLogs]);
 
     const activeInvoicesCount = totalReceipts || 0;
-    const pendingCount = receipts.filter(r => r.status === 'Processing' || r.status === 'Pending').length; // Approximation based on loaded batch or if backend supports status count
+    const pendingCount = receipts.filter(r => r.status === 'Processing' || r.status === 'Pending').length;
     const failedTodayCount = logs.filter(l => l.level === 'error' && new Date(l.timestamp).toDateString() === new Date().toDateString()).length;
 
     const handleRefresh = () => {
@@ -82,7 +81,7 @@ export default function Dashboard() {
                         icon={<Clock className="h-5 w-5 text-[#67550F]" />}
                         iconBg="bg-[#FEF3C7]"
                         label="Pending Clearance"
-                        value={String(pendingCount)} // Placeholder: ideally fetched via filtered count
+                        value={String(pendingCount)}
                         trend={{ value: "5%", isUp: false }}
                     />
                     <StatCard
@@ -106,7 +105,7 @@ export default function Dashboard() {
                 <QuickActions />
 
                 {/* Recent Activity */}
-                <RecentActivity period={selectedPeriod} />
+                <RecentActivity />
 
                 {/* System Status */}
                 <SystemStatus />

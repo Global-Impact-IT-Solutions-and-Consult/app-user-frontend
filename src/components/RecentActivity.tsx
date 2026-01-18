@@ -1,20 +1,12 @@
 import { Badge } from "./ui/Badge";
-import { Send, Download, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useReceiptStore } from "../store/receiptStore";
 import { formatCurrency } from "../lib/utils";
 
-interface RecentActivityProps {
-    period?: string;
-}
 
-export const RecentActivity = ({ period }: RecentActivityProps) => {
-    // We use the receipts already fetched by the parent Dashboard or Store
-    // If we wanted specific "Recent Activity" API, we would use that.
-    // Here we reuse the latest receipts list.
+
+export const RecentActivity = () => {
     const { receipts, isLoading } = useReceiptStore();
-
-    // Optional: client-side filter by period if needed, or rely on API sort
-    // For now we just show what's in store (top 10 recent)
     const displayReceipts = receipts.slice(0, 10);
 
     const getStatusVariant = (status: string) => {

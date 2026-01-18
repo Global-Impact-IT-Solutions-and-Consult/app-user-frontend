@@ -64,7 +64,8 @@ export default function VerifyAccount() {
             await verifyMfa(code);
             await fetchCompanies();
             navigate("/dashboard");
-        } catch (err: any) {
+        } catch (err) {
+            // @ts-expect-error - assuming standard error structure
             setError(err.response?.data?.message || "Verification failed. Invalid code.");
         } finally {
             setIsLoading(false);
@@ -77,7 +78,7 @@ export default function VerifyAccount() {
             setTimer(179);
             setError(null);
             // Optionally show success toast
-        } catch (err: any) {
+        } catch {
             setError("Failed to resend OTP.");
         }
     };

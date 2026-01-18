@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
+
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+        };
+    };
+}
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
@@ -32,10 +40,10 @@ export default function Login() {
         try {
             await login(formData);
             navigate("/verify-account");
-        } catch (err: any) {
+        } catch (err) {
             console.log(err)
             // If 429 Account locked, or 401 Invalid credentials
-            setError(err.response?.data?.message || "Login failed. Please check your credentials.");
+            setError((err as ApiError).response?.data?.message || "Login failed. Please check your credentials.");
         } finally {
             setIsLoading(false);
         }

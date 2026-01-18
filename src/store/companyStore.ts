@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '../lib/api';
 
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+        };
+    };
+}
+
 export interface CompanyMember {
     id: string;
     email: string;
@@ -21,7 +29,7 @@ export interface CompanySetting {
     isActive: boolean;
     nrsClientId?: string;
     nrsClientSecret?: string;
-    webhooks: any[]; // refined later
+    webhooks: Webhook[]; // refined later
 }
 
 export interface CompanySettingsResponse {
@@ -37,11 +45,14 @@ interface Company {
     legalName?: string;
     taxId?: string;
     status: string;
-    documents: any;
+    documents: Record<string, unknown>[];
+    error: string | null;
+    filters: Record<string, unknown>;
+    stats: Record<string, unknown>; // e.g. { activeMembers: 10, ... }
     approvedAt: string | null;
     approvedBy: string | null;
     isActive: boolean;
-    onboardingSteps: any;
+    onboardingSteps: Record<string, unknown>;
     createdAt: string;
     updatedAt: string;
     members: CompanyMember[];
@@ -76,20 +87,24 @@ interface CompanyState {
     apiKeys: ApiKey[];
 
     // Actions
-    createCompany: (data: any) => Promise<void>;
+    createCompany: (data: Record<string, unknown>) => Promise<void>;
+    updateCompany: (id: string, data: Record<string, unknown>) => Promise<void>;
     fetchCompanies: () => Promise<void>;
     setCurrentCompany: (company: Company) => void;
+    fetchCompanyMembers: (companyId: string) => Promise<void>;
+    inviteMember: (companyId: string, email: string, role: string) => Promise<void>;
+    removeMember: (companyId: string, userId: string) => Promise<void>;
 
     // Webhooks
     fetchWebhooks: (companyId: string) => Promise<void>;
-    createWebhook: (companyId: string, data: any) => Promise<any>;
-    updateWebhook: (companyId: string, webhookId: string, data: any) => Promise<void>;
+    createWebhook: (companyId: string, data: Record<string, unknown>) => Promise<Webhook>;
+    updateWebhook: (companyId: string, webhookId: string, data: Record<string, unknown>) => Promise<void>;
 
     // API Keys
     fetchCompanySettings: (companyId: string) => Promise<void>;
     fetchApiKeys: (companyId: string) => Promise<void>;
     revokeApiKey: (companyId: string, keyId: string) => Promise<void>;
-    regenerateApiKey: (companyId: string, userId: string, type: 'live' | 'test') => Promise<void>;
+    regenerateApiKey: (companyId: string, type: 'live' | 'test') => Promise<void>;
 }
 
 export const useCompanyStore = create<CompanyState>()(
@@ -115,13 +130,39 @@ export const useCompanyStore = create<CompanyState>()(
 
                     // Also refresh list if needed
                     await useCompanyStore.getState().fetchCompanies();
-                } catch (error: any) {
-                    set({ error: error.response?.data?.message || 'Failed to create company' });
+                } catch (error) {
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch webhooks' });
                     throw error;
                 } finally {
                     set({ isLoading: false });
                 }
             },
+
+            updateCompany: async (id, data) => {
+                set({ isLoading: true, error: null });
+                try {
+                    await api.put(`/companies/${id}`, data);
+                    await useCompanyStore.getState().fetchCompanies();
+                } catch (error) {
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to update company' });
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
+
+            fetchCompanyMembers: async () => {
+                // Placeholder
+            },
+
+            inviteMember: async () => {
+                // Placeholder
+            },
+
+            removeMember: async () => {
+                // Placeholder
+            },
+
+
 
             fetchCompanies: async () => {
                 set({ isLoading: true, error: null });
@@ -137,8 +178,8 @@ export const useCompanyStore = create<CompanyState>()(
                         set({ currentCompany: result[0] });
                     }
 
-                } catch (error: any) {
-                    set({ error: error.response?.data?.message || 'Failed to fetch companies' });
+                } catch (error) {
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch companies' });
                 } finally {
                     set({ isLoading: false });
                 }
@@ -155,9 +196,9 @@ export const useCompanyStore = create<CompanyState>()(
                     console.log("Webhooks:", response);
                     const result = response.data.data || response.data;
                     set({ webhooks: result });
-                } catch (error: any) {
-                    console.error("Failed to fetch webhooks", error);
-                    // Optionally set error
+                } catch (error) {
+                    console.error("Failed to create webhook", error);
+                    throw error;
                 } finally {
                     set({ isLoading: false });
                 }
@@ -171,9 +212,9 @@ export const useCompanyStore = create<CompanyState>()(
                     const result = response.data.data || response.data;
                     set(state => ({ webhooks: [...state.webhooks, result] }));
                     return result;
-                } catch (error: any) {
-                    console.error("Failed to create webhook", error);
-                    set({ error: error.response?.data?.message || 'Failed to create webhook' });
+                } catch (error) {
+                    console.error("Failed to create company", error);
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to create company' });
                     throw error;
                 } finally {
                     set({ isLoading: false });
@@ -185,12 +226,12 @@ export const useCompanyStore = create<CompanyState>()(
                 try {
                     const response = await api.put(`/companies/${companyId}/webhooks/${webhookId}`, data);
                     console.log("Updated webhook:", response);
-                    // const result = response.data.data || response.data;
+
                     // Verify if PUT returns updated object or we just fetch fresh list
                     await useCompanyStore.getState().fetchWebhooks(companyId);
-                } catch (error: any) {
+                } catch (error) {
                     console.error("Failed to update webhook", error);
-                    set({ error: error.response?.data?.message || 'Failed to update webhook' });
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to update webhook' });
                     throw error;
                 } finally {
                     set({ isLoading: false });
@@ -204,7 +245,7 @@ export const useCompanyStore = create<CompanyState>()(
                     console.log("Company settings:", response);
                     const result = response.data.data || response.data;
                     set({ companySettings: result });
-                } catch (error: any) {
+                } catch (error) {
                     console.error("Failed to fetch company settings", error);
                 } finally {
                     set({ isLoading: false });
@@ -218,7 +259,7 @@ export const useCompanyStore = create<CompanyState>()(
                     console.log("API keys:", response);
                     const result = response.data.data || response.data;
                     set({ apiKeys: result });
-                } catch (error: any) {
+                } catch (error) {
                     console.error("Failed to fetch API keys", error);
                 } finally {
                     set({ isLoading: false });
@@ -232,9 +273,9 @@ export const useCompanyStore = create<CompanyState>()(
                     console.log("API key revoked successfully", response);
                     // Refresh list
                     set(state => ({ apiKeys: state.apiKeys.filter(k => k.id !== keyId) }));
-                } catch (error: any) {
+                } catch (error) {
                     console.error("Failed to revoke API key", error);
-                    set({ error: error.response?.data?.message || 'Failed to revoke API key' });
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to revoke API key' });
                     throw error;
                 } finally {
                     set({ isLoading: false });
@@ -248,16 +289,14 @@ export const useCompanyStore = create<CompanyState>()(
                         environment: type
                     });
                     console.log("API key regenerated successfully", response);
-                    // Fetch updated settings immediately as per user request "regenerate then fetch"
-                    // Although UI handles it, having it here ensures consistency
-                    // await useCompanyStore.getState().fetchCompanySettings(companyId); 
-                    // (Commented out effectively because Settings.tsx does it, but maybe I should do it here?
-                    // User said "logic should be similar to that to the webhook". 
-                    // Webhook action: "createWebhook" updates state or returns result.
-                    // I'll stick to just API call here.
-                } catch (error: any) {
+                    // Refresh list
+                    await useCompanyStore.getState().fetchApiKeys(companyId);
+                    // Update company settings
+                    await useCompanyStore.getState().fetchCompanySettings(companyId);
+                    return response.data.data.publicKey;
+                } catch (error) {
                     console.error("Failed to regenerate API key", error);
-                    set({ error: error.response?.data?.message || 'Failed to regenerate API key' });
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to regenerate API key' });
                     throw error;
                 } finally {
                     set({ isLoading: false });
