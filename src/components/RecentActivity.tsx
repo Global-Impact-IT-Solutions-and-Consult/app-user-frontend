@@ -1,73 +1,21 @@
 import { Badge } from "./ui/Badge";
-import { Send, Download } from "lucide-react";
+import { FileText } from "lucide-react";
+import { useReceiptStore } from "../store/receiptStore";
+import { formatCurrency } from "../lib/utils";
 
-const activities = [
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-08",
-        counterparty: "Global Supplies Ltd. (Buyer)",
-        amount: "₦1,250,000",
-        status: "Cleared",
-        statusVariant: "success" as const,
-        action: "Transmit"
-    },
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-07",
-        counterparty: "Tech Innovations (Buyer)",
-        amount: "₦850,450",
-        status: "Sent to NRS",
-        statusVariant: "primary" as const,
-        action: "Monitor"
-    },
-    {
-        type: "Received",
-        icon: Download,
-        id: "INV-2025-654321",
-        date: "2025-11-07",
-        counterparty: "Raw Materials Inc. (Supplier)",
-        amount: "₦3,450,000",
-        status: "Downloaded",
-        statusVariant: "primary" as const,
-        action: "View"
-    },
-    {
-        type: "Received",
-        icon: Download,
-        id: "INV-2025-654321",
-        date: "2025-11-07",
-        counterparty: "Raw Materials Inc. (Supplier)",
-        amount: "₦3,450,000",
-        status: "Processing",
-        statusVariant: "warning" as const,
-        action: "Acknowledge"
-    },
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-07",
-        counterparty: "Tech Innovations (Buyer)",
-        amount: "₦850,450",
-        status: "Sent to NRS",
-        statusVariant: "primary" as const,
-        action: "Monitor"
-    }
-];
 
-interface RecentActivityProps {
-    period?: string;
-}
 
-export const RecentActivity = ({ period }: RecentActivityProps) => {
-    // Simulate filtering based on period
-    const filteredActivities = period === "7days"
-        ? activities.slice(0, 3)
-        : activities;
+export const RecentActivity = () => {
+    const { receipts, isLoading } = useReceiptStore();
+    const displayReceipts = receipts.slice(0, 10);
+
+    const getStatusVariant = (status: string) => {
+        const s = status.toLowerCase();
+        if (s === 'cleared' || s === 'success' || s === 'paid') return 'success';
+        if (s === 'processing' || s === 'pending') return 'warning';
+        if (s === 'failed' || s === 'rejected') return 'danger';
+        return 'primary';
+    };
 
     return (
         <section className="space-y-4">
@@ -86,36 +34,48 @@ export const RecentActivity = ({ period }: RecentActivityProps) => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
-                        {filteredActivities.map((activity, index) => (
-                            <tr key={index} className="hover:bg-surface-50/50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                        <Badge
-                                            variant={activity.type === "Sent" ? "primary" : "success"}
-                                            size="sm"
-                                            className="font-medium"
-                                            icon={<activity.icon className="h-3 w-3" />}
-                                        >
-                                            {activity.type}
-                                        </Badge>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-surface-600">{activity.id}</td>
-                                <td className="px-6 py-4 text-surface-900">{activity.date}</td>
-                                <td className="px-6 py-4 text-surface-600">{activity.counterparty}</td>
-                                <td className="px-6 py-4 text-surface-900">{activity.amount}</td>
-                                <td className="px-6 py-4">
-                                    <Badge variant={activity.statusVariant} size="sm">
-                                        {activity.status}
-                                    </Badge>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <button className="text-primary-500 font-medium hover:underline">
-                                        {activity.action}
-                                    </button>
-                                </td>
+                        {isLoading && displayReceipts.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} className="px-6 py-8 text-center text-surface-500">Loading recent activity...</td>
                             </tr>
-                        ))}
+                        ) : displayReceipts.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} className="px-6 py-8 text-center text-surface-500">No recent activity found.</td>
+                            </tr>
+                        ) : (
+                            displayReceipts.map((receipt, index) => (
+                                <tr key={receipt.id || index} className="hover:bg-surface-50/50 transition-colors">
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            <Badge
+                                                variant="primary"
+                                                size="sm"
+                                                className="font-medium"
+                                                icon={<FileText className="h-3 w-3" />}
+                                            >
+                                                {receipt.type || 'Invoice'}
+                                            </Badge>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-surface-600 font-medium">{receipt.receiptNumber}</td>
+                                    <td className="px-6 py-4 text-surface-900">{new Date(receipt.issueDate).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-surface-600">{receipt.counterpartyName}</td>
+                                    <td className="px-6 py-4 text-surface-900 font-bold">
+                                        {formatCurrency(receipt.totalAmount, receipt.currency)}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <Badge variant={getStatusVariant(receipt.status)} size="sm">
+                                            {receipt.status}
+                                        </Badge>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <button className="text-primary-500 font-medium hover:underline">
+                                            View
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>

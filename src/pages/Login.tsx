@@ -1,11 +1,53 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../store/authStore";
+
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+        };
+    };
+}
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 import { Lock, ChevronDown } from "lucide-react";
 
 export default function Login() {
-    const navigate = useNavigate();
+    const navigate = useNavigate()
+    const { login } = useAuthStore();
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [formData, setFormData] = useState({
+        email: "",
+        password: ""
+    });
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    const handleLogin = async () => {
+        if (!formData.email || !formData.password) {
+            setError("Please fill in all fields");
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            await login(formData);
+            navigate("/verify-account");
+        } catch (err) {
+            console.log(err)
+            // If 429 Account locked, or 401 Invalid credentials
+            setError((err as ApiError).response?.data?.message || "Login failed. Please check your credentials.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-surface-50 flex items-center justify-center p-4">
@@ -29,15 +71,31 @@ export default function Login() {
                         </p>
                     </div>
 
+                    {error && (
+                        <div className="mb-4 p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-200">
+                            {error}
+                        </div>
+                    )}
+
                     <div className="space-y-6 flex-1">
-                        <Input label="Email Address *" type="email" placeholder="name@yourcompany.com" />
+                        <Input
+                            label="Email Address *"
+                            type="email"
+                            name="email"
+                            placeholder="name@yourcompany.com"
+                            value={formData.email}
+                            onChange={handleChange}
+                        />
                         <div className="space-y-1">
                             <div className="relative">
                                 <Input
                                     label="Password *"
                                     type="password"
+                                    name="password"
                                     placeholder="************"
                                     className="pr-10"
+                                    value={formData.password}
+                                    onChange={handleChange}
                                 />
                                 <button className="absolute right-3 top-[38px] text-surface-900 hover:text-surface-600">
                                     <ChevronDown className="h-4 w-4" />
@@ -53,8 +111,8 @@ export default function Login() {
                             </div>
                         </div>
 
-                        <Button className="w-full py-6 text-base" onClick={() => navigate("/verify-account")}>
-                            Login
+                        <Button className="w-full py-6 text-base" onClick={handleLogin} disabled={isLoading}>
+                            {isLoading ? "Logging in..." : "Login"}
                         </Button>
 
                         <div className="relative py-4">

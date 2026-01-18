@@ -14,6 +14,7 @@ import {
     ChevronRight
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useReceiptStore } from "../store/receiptStore";
 
 const tabs = [
     { label: "All Invoices", count: 10, id: "all" },
@@ -23,168 +24,84 @@ const tabs = [
     { label: "Failed", count: 1, id: "failed" },
 ];
 
-const mockInvoices = [
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-08",
-        counterparty: "Global Supplies Ltd. (Buyer)",
-        amount: "₦1,250,000",
-        status: "Cleared",
-        statusVariant: "success" as const,
-        action: "Transmit"
-    },
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-07",
-        counterparty: "Tech Innovations (Buyer)",
-        amount: "₦850,450",
-        status: "Sent to NRS",
-        statusVariant: "primary" as const,
-        action: "Monitor"
-    },
-    {
-        type: "Received",
-        icon: Download,
-        id: "INV-2025-654321",
-        date: "2025-11-07",
-        counterparty: "Raw Materials Inc. (Supplier)",
-        amount: "₦3,450,000",
-        status: "Downloaded",
-        statusVariant: "primary" as const,
-        action: "View"
-    },
-    {
-        type: "Received",
-        icon: Download,
-        id: "INV-2025-654321",
-        date: "2025-11-07",
-        counterparty: "Raw Materials Inc. (Supplier)",
-        amount: "₦3,450,000",
-        status: "Processing",
-        statusVariant: "warning" as const,
-        action: "Acknowledge"
-    },
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-08",
-        counterparty: "Global Supplies Ltd. (Buyer)",
-        amount: "₦1,250,000",
-        status: "Cleared",
-        statusVariant: "success" as const,
-        action: "Transmit"
-    },
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-08",
-        counterparty: "Global Supplies Ltd. (Buyer)",
-        amount: "₦1,250,000",
-        status: "Cleared",
-        statusVariant: "success" as const,
-        action: "Transmit"
-    },
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-07",
-        counterparty: "Tech Innovations (Buyer)",
-        amount: "₦850,450",
-        status: "Sent to NRS",
-        statusVariant: "primary" as const,
-        action: "Monitor"
-    },
-    {
-        type: "Received",
-        icon: Download,
-        id: "INV-2025-654321",
-        date: "2025-11-07",
-        counterparty: "Raw Materials Inc. (Supplier)",
-        amount: "₦3,450,000",
-        status: "Processing",
-        statusVariant: "warning" as const,
-        action: "Acknowledge"
-    },
-    {
-        type: "Sent",
-        icon: Send,
-        id: "INV-2025-789012",
-        date: "2025-11-07",
-        counterparty: "Tech Innovations (Buyer)",
-        amount: "₦850,450",
-        status: "Sent to NRS",
-        statusVariant: "primary" as const,
-        action: "Monitor"
-    },
-    {
-        type: "Received",
-        icon: Download,
-        id: "INV-2025-654321",
-        date: "2025-11-07",
-        counterparty: "Raw Materials Inc. (Supplier)",
-        amount: "₦3,450,000",
-        status: "Processing",
-        statusVariant: "warning" as const,
-        action: "Acknowledge"
-    }
-];
+
 
 export default function Invoices() {
     const navigate = useNavigate();
+    const {
+        receipts,
+        totalReceipts,
+        isLoading,
+        fetchReceipts
+    } = useReceiptStore();
+
     const [activeTab, setActiveTab] = React.useState("all");
     const [searchQuery, setSearchQuery] = React.useState("");
-    const [typeFilter, setTypeFilter] = React.useState("All Types");
     const [statusFilter, setStatusFilter] = React.useState("All Statuses");
     const [dateRange, setDateRange] = React.useState("All Time");
+    const [page, setPage] = React.useState(1);
+    const limit = 20;
 
-    // Dynamic counts
-    const counts = React.useMemo(() => ({
-        all: mockInvoices.length,
-        sent: mockInvoices.filter(inv => inv.type === "Sent").length,
-        received: mockInvoices.filter(inv => inv.type === "Received").length,
-        pending: mockInvoices.filter(inv => inv.status === "Processing" || inv.status === "Sent to NRS").length,
-        failed: mockInvoices.filter(inv => inv.status === "Failed").length, // Added failed status for logic
-    }), []);
+    interface InvoiceParams {
+        page: number;
+        limit: number;
+        search?: string;
+        dateFrom?: string;
+        [key: string]: unknown;
+    }
 
-    const filteredInvoices = React.useMemo(() => {
-        return mockInvoices.filter((inv) => {
-            // 1. Tab filtering
-            if (activeTab === "sent" && inv.type !== "Sent") return false;
-            if (activeTab === "received" && inv.type !== "Received") return false;
-            if (activeTab === "pending" && !(inv.status === "Processing" || inv.status === "Sent to NRS")) return false;
-            if (activeTab === "failed" && inv.status !== "Failed") return false;
+    React.useEffect(() => {
+        const params: InvoiceParams = {
+            page,
+            limit,
+        };
 
-            // 2. Select filters
-            if (typeFilter !== "All Types" && inv.type !== typeFilter) return false;
-            if (statusFilter !== "All Statuses" && inv.status !== statusFilter) return false;
+        if (activeTab !== 'all') {
+            // Type filtering Logic
+        }
 
-            // 3. Search query
-            if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                return (
-                    inv.id.toLowerCase().includes(query) ||
-                    inv.counterparty.toLowerCase().includes(query)
-                );
+        if (searchQuery) {
+            params.search = searchQuery;
+        }
+
+        if (statusFilter !== "All Statuses") {
+            // Status filtering Logic
+        }
+
+        if (dateRange !== "All Time") {
+            const now = new Date();
+            if (dateRange === "Last 7 Days") {
+                const past = new Date(now.setDate(now.getDate() - 7));
+                params.dateFrom = past.toISOString();
+            } else if (dateRange === "Last 30 Days") {
+                const past = new Date(now.setDate(now.getDate() - 30));
+                params.dateFrom = past.toISOString();
             }
+        }
 
-            return true;
-        });
-    }, [activeTab, typeFilter, statusFilter, searchQuery]);
+        fetchReceipts(params);
+    }, [activeTab, searchQuery, statusFilter, dateRange, page, fetchReceipts]);
 
     const handleClearFilters = () => {
         setSearchQuery("");
-        setTypeFilter("All Types");
         setStatusFilter("All Statuses");
         setDateRange("All Time");
         setActiveTab("all");
     };
+
+    // Client-side filtering fallback
+    const displayedReceipts = React.useMemo(() => {
+        return receipts.filter(r => {
+            if (activeTab === 'sent' && r.type !== 'sent') return false;
+            if (activeTab === 'received' && r.type !== 'received') return false;
+            if (activeTab === 'pending' && r.status !== 'processing') return false;
+            if (activeTab === 'failed' && r.status !== 'failed') return false;
+
+            if (statusFilter !== "All Statuses" && r.status !== statusFilter) return false;
+
+            return true;
+        });
+    }, [receipts, activeTab, statusFilter]);
 
     return (
         <div className="p-8 space-y-8">
@@ -212,15 +129,6 @@ export default function Invoices() {
             <section className="bg-white p-6 rounded-2xl border border-surface-200">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                     <Select
-                        label="Type"
-                        value={typeFilter}
-                        onChange={(e) => setTypeFilter(e.target.value)}
-                    >
-                        <option>All Types</option>
-                        <option>Sent</option>
-                        <option>Received</option>
-                    </Select>
-                    <Select
                         label="Status"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -240,7 +148,7 @@ export default function Invoices() {
                         <option>Last 7 Days</option>
                         <option>Last 30 Days</option>
                     </Select>
-                    <div className="space-y-1.5 flex-[2]">
+                    <div className="space-y-1.5 flex-[2] col-span-2">
                         <label className="text-sm font-medium text-surface-900 uppercase tracking-wider">Search</label>
                         <div className="flex gap-3">
                             <Input
@@ -275,12 +183,6 @@ export default function Invoices() {
                                 : "border-gray-100 text-surface-900/60 hover:text-surface-900 px-4 rounded-full"
                         )}
                     >
-                        <span className={cn(
-                            "flex items-center justify-center h-5 px-1.5 rounded-full text-[10px]",
-                            activeTab === tab.id ? "bg-primary-500 text-white" : "bg-surface-100 text-surface-900"
-                        )}>
-                            {counts[tab.id as keyof typeof counts]}
-                        </span>
                         {tab.label}
                     </button>
                 ))}
@@ -304,59 +206,85 @@ export default function Invoices() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-100">
-                        {filteredInvoices.map((activity, index) => (
-                            <tr
-                                key={index}
-                                className="hover:bg-surface-50/50 transition-colors cursor-pointer"
-                                onClick={() => navigate(`/dashboard/invoices/${activity.id}`)}
-                            >
-                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                                    <input type="checkbox" className="rounded border-surface-300" />
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                        <Badge
-                                            variant={activity.type === "Sent" ? "primary" : "success"}
-                                            size="sm"
-                                            className="font-medium"
-                                            icon={<activity.icon className="h-3 w-3" />}
-                                        >
-                                            {activity.type}
-                                        </Badge>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-surface-600">{activity.id}</td>
-                                <td className="px-6 py-4 text-surface-600">{activity.date}</td>
-                                <td className="px-6 py-4 text-surface-600">{activity.counterparty}</td>
-                                <td className="px-6 py-4 text-surface-900">{activity.amount}</td>
-                                <td className="px-6 py-4">
-                                    <Badge variant={activity.statusVariant} size="sm">
-                                        {activity.status}
-                                    </Badge>
-                                </td>
-                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                                    <button className="text-primary-500 font-medium hover:underline">
-                                        {activity.action}
-                                    </button>
+                        {isLoading ? (
+                            <tr>
+                                <td colSpan={8} className="px-6 py-12 text-center text-surface-500">
+                                    Loading invoices...
                                 </td>
                             </tr>
-                        ))}
+                        ) : displayedReceipts.length === 0 ? (
+                            <tr>
+                                <td colSpan={8} className="px-6 py-12 text-center text-surface-500">
+                                    No invoices found.
+                                </td>
+                            </tr>
+                        ) : (
+                            displayedReceipts.map((activity, index) => (
+                                <tr
+                                    key={index}
+                                    className="hover:bg-surface-50/50 transition-colors cursor-pointer"
+                                    onClick={() => navigate(`/dashboard/invoices/${activity.id}`)}
+                                >
+                                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                        <input type="checkbox" className="rounded border-surface-300" />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            <Badge
+                                                variant={activity.type === "sent" ? "primary" : "success"}
+                                                size="sm"
+                                                className="font-medium"
+                                                icon={activity.type === "sent" ? <Send className="h-3 w-3" /> : <Download className="h-3 w-3" />}
+                                            >
+                                                {activity.type === "sent" ? "Sent" : "Received"}
+                                            </Badge>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-surface-600">{activity.receiptNumber || activity.id}</td>
+                                    <td className="px-6 py-4 text-surface-600">
+                                        {activity.issueDate ? new Date(activity.issueDate).toLocaleDateString() : 'N/A'}
+                                    </td>
+                                    <td className="px-6 py-4 text-surface-600">{activity.counterpartyName || 'Unknown'}</td>
+                                    <td className="px-6 py-4 text-surface-900">
+                                        {activity.currency} {activity.totalAmount?.toLocaleString()}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <Badge variant="primary" size="sm">
+                                            {activity.status}
+                                        </Badge>
+                                    </td>
+                                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                        <button className="text-primary-500 font-medium hover:underline">
+                                            View
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
 
                 {/* Pagination */}
                 <div className="px-6 py-4 bg-surface-50 border-t border-surface-200 flex items-center justify-between">
-                    <p className="text-xs text-surface-900/70">Showing 1-{filteredInvoices.length} of {filteredInvoices.length} invoices</p>
+                    <p className="text-xs text-surface-900/70">
+                        {totalReceipts > 0
+                            ? `Showing ${(page - 1) * limit + 1}-${Math.min(page * limit, totalReceipts)} of ${totalReceipts} invoices`
+                            : "No invoices"}
+                    </p>
                     <div className="flex items-center gap-2">
-                        <button className="p-1 hover:bg-surface-100 rounded text-surface-900/60">
+                        <button
+                            className="p-1 hover:bg-surface-100 rounded text-surface-900/60 disabled:opacity-50"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                        >
                             <ChevronLeft className="h-4 w-4" />
                         </button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded bg-primary-500 text-white text-xs font-bold shadow-sm">1</button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-surface-100 text-surface-600 text-xs font-medium">2</button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-surface-100 text-surface-600 text-xs font-medium">3</button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-surface-100 text-surface-600 text-xs font-medium">4</button>
-                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-surface-100 text-surface-600 text-xs font-medium">5</button>
-                        <button className="p-1 hover:bg-surface-100 rounded text-surface-900/60">
+                        <span className="text-xs font-medium text-surface-600">Page {page}</span>
+                        <button
+                            className="p-1 hover:bg-surface-100 rounded text-surface-900/60 disabled:opacity-50"
+                            onClick={() => setPage(p => p + 1)}
+                            disabled={page * limit >= totalReceipts}
+                        >
                             <ChevronRight className="h-4 w-4" />
                         </button>
                     </div>

@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../store/authStore";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card"; // Added Card import
@@ -6,10 +8,33 @@ import { ShieldCheck, LifeBuoy, FileText } from "lucide-react";
 
 export default function Signup() {
     const navigate = useNavigate();
+    const { signup } = useAuthStore();
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [formData, setFormData] = useState({
+        firstName: "",
+        lastName: "",
+        email: "",
+        password: ""
+    });
 
-    const handleSignup = (e: React.FormEvent) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
-        navigate("/onboarding");
+        setIsLoading(true);
+        setError(null);
+        try {
+            await signup(formData);
+            navigate("/verify-account");
+        } catch (err) {
+            // @ts-expect-error - assuming standard error structure or simple message fallback
+            setError(err.response?.data?.message || "Signup failed. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -31,25 +56,57 @@ export default function Signup() {
                         <div className="space-y-2 text-center lg:text-left">
                             <h1 className="text-3xl font-bold tracking-tight text-primary-500">Get Started</h1>
                             <p className="text-sm text-surface-500 leading-relaxed font-medium">
-                                Enter your business email address. We'll send you a secure link to create your account and begin the onboarding process.
+                                Create your account to start managing your invoices.
                             </p>
                         </div>
 
+                        {error && (
+                            <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md border border-red-200">
+                                {error}
+                            </div>
+                        )}
+
                         <form onSubmit={handleSignup} className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="First Name *"
+                                    name="firstName"
+                                    placeholder="John"
+                                    value={formData.firstName}
+                                    onChange={handleChange}
+                                    required
+                                />
+                                <Input
+                                    label="Last Name *"
+                                    name="lastName"
+                                    placeholder="Doe"
+                                    value={formData.lastName}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </div>
                             <Input
                                 label="Business Email Address *"
-                                placeholder="name@yourcomapny.com"
+                                name="email"
+                                placeholder="name@yourcompany.com"
                                 type="email"
+                                value={formData.email}
+                                onChange={handleChange}
                                 required
                             />
                             <Input
-                                label="Tax Identification Number (TIN) *"
-                                placeholder="e.g., 12345678-001"
+                                label="Password *"
+                                name="password"
+                                type="password"
+                                placeholder="Create a password"
+                                value={formData.password}
+                                onChange={handleChange}
                                 required
+                                minLength={8}
                             />
 
-                            <Button type="submit" className="w-full text-base h-12">
-                                Send Secure Link
+                            <Button type="submit" disabled={isLoading} className="w-full text-base h-12">
+                                {isLoading ? "Creating Account..." : "Create Account"}
                             </Button>
                         </form>
 

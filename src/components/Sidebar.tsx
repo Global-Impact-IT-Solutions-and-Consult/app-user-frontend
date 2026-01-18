@@ -11,6 +11,8 @@ import {
 import { cn } from "../lib/utils";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
+import { useAuthStore } from "../store/authStore";
+import { useCompanyStore } from "../store/companyStore";
 
 interface NavItemProps {
     icon: React.ElementType;
@@ -41,6 +43,13 @@ const NavItem = ({ icon: Icon, label, to, end }: NavItemProps) => (
 
 export const Sidebar = () => {
     const navigate = useNavigate();
+    const { logout, user, setEnvironment } = useAuthStore();
+    const { currentCompany, isLoading } = useCompanyStore();
+
+    const handleLogout = () => {
+        logout();
+        navigate("/login");
+    };
 
     return (
         <aside className="flex h-screen w-64 flex-col border-r border-surface-300 bg-white shrink-0">
@@ -80,14 +89,19 @@ export const Sidebar = () => {
             {/* Environment Switcher */}
             <div className="px-4 py-6 space-y-3">
                 <Badge
-                    variant="warning"
+                    variant={user?.currentEnvironment === 'live' ? 'success' : 'warning'}
                     className="w-full justify-center py-2.5 rounded-lg text-sm"
-                    icon={<FlaskConical className="h-4 w-4" />}
+                    icon={user?.currentEnvironment === 'live' ? <Settings className="h-4 w-4" /> : <FlaskConical className="h-4 w-4" />}
                 >
-                    Test Environment
+                    {user?.currentEnvironment === 'live' ? 'Live Environment' : 'Test Environment'}
                 </Badge>
-                <Button variant="outline" className="w-full h-11 border-surface-200 text-surface-400 hover:text-surface-900">
-                    Switch to live
+                <Button
+                    variant="outline"
+                    className="w-full h-11 border-surface-200 text-surface-400 hover:text-surface-900"
+                    onClick={() => setEnvironment(user?.currentEnvironment === 'live' ? 'test' : 'live')}
+                    disabled={isLoading}
+                >
+                    {isLoading ? 'Switching...' : (user?.currentEnvironment === 'live' ? 'Switch to Test' : 'Switch to Live')}
                 </Button>
             </div>
 
@@ -98,14 +112,14 @@ export const Sidebar = () => {
                         AM
                     </div>
                     <div className="flex-1 overflow-hidden">
-                        <p className="truncate text-sm font-bold text-surface-900">Acme Manufacturing</p>
-                        <p className="truncate text-[10px] text-surface-400 font-medium">NG-APP-5678-ACME</p>
+                        <p className="truncate text-sm font-bold text-surface-900">{currentCompany?.name || "No Company"}</p>
+                        <p className="truncate text-[10px] text-surface-400 font-medium">{currentCompany?.taxId || "ID: ---"}</p>
                     </div>
                 </div>
                 <Button
                     variant="outline"
                     className="w-full h-11 gap-2 bg-primary-50/30 border-primary-100 text-surface-900 hover:bg-primary-50/50"
-                    onClick={() => navigate("/login")}
+                    onClick={handleLogout}
                 >
                     <LogOutIcon className="h-4 w-4" />
                     Log Out
