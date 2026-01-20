@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import { DashboardLayout } from "./components/DashboardLayout";
 import RequireAuth from "./components/RequireAuth";
 import RequireGuest from "./components/RequireGuest";
+import RequireCompany from "./components/RequireCompany";
 
 function App() {
   return (
@@ -29,12 +30,14 @@ function App() {
         <Route path="/onboarding" element={<OnboardingFlow />} />
 
         {/* Dashboard Routes with Shared Layout */}
-        <Route path="/dashboard" element={<DashboardLayout><Outlet /></DashboardLayout>}>
-          <Route index element={<Dashboard />} />
-          <Route path="invoices" element={<Invoices />} />
-          <Route path="invoices/:id" element={<InvoiceDetails />} />
-          <Route path="logs" element={<Logs />} />
-          <Route path="settings" element={<Settings />} />
+        <Route element={<RequireCompany />}>
+          <Route path="/dashboard" element={<DashboardLayout><Outlet /></DashboardLayout>}>
+            <Route index element={<Dashboard />} />
+            <Route path="invoices" element={<Invoices />} />
+            <Route path="invoices/:id" element={<InvoiceDetails />} />
+            <Route path="logs" element={<Logs />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
         </Route>
       </Route>
     </Routes>
