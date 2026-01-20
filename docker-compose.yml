@@ -4,8 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8001:80"
+      - "8000:80"
     container_name: app-user-frontend
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      - VITE_API_URL=http://localhost:4002/api
