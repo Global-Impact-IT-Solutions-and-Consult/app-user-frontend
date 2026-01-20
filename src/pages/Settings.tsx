@@ -136,11 +136,11 @@ const GeneralTab = () => (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-surface-900">Contact Email <span className="text-danger-500">*</span></label>
-                            <Input defaultValue={useCompanyStore().currentCompany?.email || ''} />
+                            <Input defaultValue='' />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-surface-900">Contact Phone <span className="text-danger-500">*</span></label>
-                            <Input defaultValue={useCompanyStore().currentCompany?.phone || ''} />
+                            <Input defaultValue='' />
                         </div>
                     </div>
                 </div>

@@ -40,6 +40,7 @@ interface AuthState {
     enableMfa: (code: string, secret: string) => Promise<void>;
     disableMfa: (code: string) => Promise<void>;
     setEnvironment: (env: 'test' | 'live') => Promise<void>;
+    logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
