@@ -165,7 +165,9 @@ export const useCompanyStore = create<CompanyState>()(
 
 
             fetchCompanies: async () => {
+                console.log("Fetching companies...");
                 set({ isLoading: true, error: null });
+                console.log("isLoading:", useCompanyStore.getState().isLoading);
                 try {
                     const response = await api.get('/companies');
                     console.log("Companies:", response);

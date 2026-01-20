@@ -63,7 +63,14 @@ export default function VerifyAccount() {
         try {
             await verifyMfa(code);
             await fetchCompanies();
-            navigate("/dashboard");
+
+            // Check direct state to avoid closure staleness
+            const companies = useCompanyStore.getState().companies;
+            if (companies && companies.length > 0) {
+                navigate("/dashboard");
+            } else {
+                navigate("/onboarding");
+            }
         } catch (err) {
             // @ts-expect-error - assuming standard error structure
             setError(err.response?.data?.message || "Verification failed. Invalid code.");
