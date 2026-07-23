@@ -5,6 +5,7 @@ import {
     FileText,
     Clock,
     Settings,
+    Plug,
     FlaskConical,
     LogOut as LogOutIcon
 } from "lucide-react";
@@ -83,6 +84,11 @@ export const Sidebar = () => {
                     icon={Settings}
                     label="Settings"
                     to="/dashboard/settings"
+                />
+                <NavItem
+                    icon={Plug}
+                    label="Integrations"
+                    to="/dashboard/integrations"
                 />
             </nav>
 
