@@ -4,13 +4,14 @@ import { useAuthStore } from "../store/authStore";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card"; // Added Card import
-import { ShieldCheck, LifeBuoy, FileText } from "lucide-react";
+import { ShieldCheck, LifeBuoy, FileText, Eye, EyeOff } from "lucide-react";
 
 export default function Signup() {
     const navigate = useNavigate();
     const { signup } = useAuthStore();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         firstName: "",
         lastName: "",
@@ -94,16 +95,27 @@ export default function Signup() {
                                 onChange={handleChange}
                                 required
                             />
-                            <Input
-                                label="Password *"
-                                name="password"
-                                type="password"
-                                placeholder="Create a password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                minLength={8}
-                            />
+                            <div className="relative">
+                                <Input
+                                    label="Password *"
+                                    name="password"
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Create a password"
+                                    className="pr-10"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    required
+                                    minLength={8}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                    className="absolute right-3 top-[38px] text-surface-900 hover:text-surface-600"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
 
                             <Button type="submit" disabled={isLoading} className="w-full text-base h-12">
                                 {isLoading ? "Creating Account..." : "Create Account"}

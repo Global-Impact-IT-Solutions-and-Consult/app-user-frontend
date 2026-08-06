@@ -12,13 +12,14 @@ interface ApiError {
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
-import { Lock, ChevronDown } from "lucide-react";
+import { Lock, Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
     const navigate = useNavigate()
     const { login } = useAuthStore();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         email: "",
         password: ""
@@ -90,15 +91,20 @@ export default function Login() {
                             <div className="relative">
                                 <Input
                                     label="Password *"
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     name="password"
                                     placeholder="************"
                                     className="pr-10"
                                     value={formData.password}
                                     onChange={handleChange}
                                 />
-                                <button className="absolute right-3 top-[38px] text-surface-900 hover:text-surface-600">
-                                    <ChevronDown className="h-4 w-4" />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                    className="absolute right-3 top-[38px] text-surface-900 hover:text-surface-600"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
                             </div>
                             <div className="flex justify-end">

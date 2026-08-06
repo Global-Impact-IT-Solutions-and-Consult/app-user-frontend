@@ -4,11 +4,14 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 import { cn } from "../lib/utils";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function ResetPassword() {
     const navigate = useNavigate();
     const [password, setPassword] = useState("");
     const [strength, setStrength] = useState(0);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const calculateStrength = (val: string) => {
         if (!val) return 0;
@@ -51,13 +54,24 @@ export default function ResetPassword() {
 
                     <div className="space-y-6">
                         <div className="space-y-6">
-                            <Input
-                                label="New Password *"
-                                type="password"
-                                placeholder="Minimum 12 character"
-                                value={password}
-                                onChange={handlePasswordChange}
-                            />
+                            <div className="relative">
+                                <Input
+                                    label="New Password *"
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Minimum 12 character"
+                                    className="pr-10"
+                                    value={password}
+                                    onChange={handlePasswordChange}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                    className="absolute right-3 top-[38px] text-surface-900 hover:text-surface-600"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-[10px] font-bold uppercase text-surface-400">
                                     <span>Password Strength</span>
@@ -78,7 +92,22 @@ export default function ResetPassword() {
                                     />
                                 </div>
                             </div>
-                            <Input label="Confirm New Password *" type="password" placeholder="Re-enter your password" />
+                            <div className="relative">
+                                <Input
+                                    label="Confirm New Password *"
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    placeholder="Re-enter your password"
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                    className="absolute right-3 top-[38px] text-surface-900 hover:text-surface-600"
+                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
 
                         <Button className="w-full py-6 text-base" onClick={() => navigate("/login")}>

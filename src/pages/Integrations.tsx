@@ -4,7 +4,7 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { Plug, BookOpen, Layers, Boxes, Database } from "lucide-react";
 import { useCompanyStore } from "../store/companyStore";
-import { useZohoBooksStore, type ZohoWebhookStatus } from "../store/zohoBooksStore";
+import { useZohoBooksStore } from "../store/zohoBooksStore";
 
 export interface IntegrationService {
     slug: string;
@@ -44,16 +44,10 @@ export const INTEGRATION_SERVICES: IntegrationService[] = [
     },
 ];
 
-const STATUS_BADGE: Record<ZohoWebhookStatus, { label: string; variant: "gray" | "warning" | "success" }> = {
-    none: { label: "Not Connected", variant: "gray" },
-    pending: { label: "Pending", variant: "warning" },
-    connected: { label: "Connected", variant: "success" },
-};
-
 export default function Integrations() {
     const navigate = useNavigate();
     const { currentCompany } = useCompanyStore();
-    const { status: zohoStatus, fetchStatus } = useZohoBooksStore();
+    const { connected: zohoConnected, fetchStatus } = useZohoBooksStore();
 
     React.useEffect(() => {
         if (currentCompany?.id) {
@@ -87,7 +81,9 @@ export default function Integrations() {
                             const Icon = service.icon;
                             const badge = service.comingSoon
                                 ? { label: "Coming Soon", variant: "gray" as const }
-                                : STATUS_BADGE[zohoStatus] ?? STATUS_BADGE.none;
+                                : zohoConnected
+                                    ? { label: "Connected", variant: "success" as const }
+                                    : { label: "Not Connected", variant: "gray" as const };
                             return (
                                 <div
                                     key={service.slug}
