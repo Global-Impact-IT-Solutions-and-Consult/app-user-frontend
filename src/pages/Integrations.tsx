@@ -2,58 +2,35 @@ import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
-import { Plug, BookOpen, Layers, Boxes, Database } from "lucide-react";
+import { Plug } from "lucide-react";
 import { useCompanyStore } from "../store/companyStore";
 import { useZohoBooksStore } from "../store/zohoBooksStore";
-
-export interface IntegrationService {
-    slug: string;
-    name: string;
-    description: string;
-    icon: React.ElementType;
-    comingSoon?: boolean;
-}
-
-export const INTEGRATION_SERVICES: IntegrationService[] = [
-    {
-        slug: "zoho-books",
-        name: "Zoho Books",
-        description: "Sync invoices and payments with Zoho Books",
-        icon: BookOpen,
-    },
-    {
-        slug: "sage",
-        name: "Sage",
-        description: "Connect your Sage accounting data",
-        icon: Layers,
-        comingSoon: true,
-    },
-    {
-        slug: "sap",
-        name: "SAP",
-        description: "Integrate with SAP for enterprise resource planning",
-        icon: Boxes,
-        comingSoon: true,
-    },
-    {
-        slug: "oracle-netsuite",
-        name: "Oracle NetSuite",
-        description: "Connect Oracle NetSuite for financial management",
-        icon: Database,
-        comingSoon: true,
-    },
-];
+import { useQuickBooksStore } from "../store/quickBooksStore";
+import { INTEGRATION_SERVICES } from "../lib/integrations";
 
 export default function Integrations() {
     const navigate = useNavigate();
     const { currentCompany } = useCompanyStore();
     const { connected: zohoConnected, fetchStatus } = useZohoBooksStore();
+    const {
+        connected: quickBooksConnected,
+        expiresAt: quickBooksExpiresAt,
+        fetchStatus: fetchQuickBooksStatus
+    } = useQuickBooksStore();
+    const [now, setNow] = React.useState<number | null>(null);
+    const quickBooksNeedsReconnect =
+        Boolean(now && quickBooksConnected && quickBooksExpiresAt && new Date(quickBooksExpiresAt).getTime() <= now);
+
+    React.useEffect(() => {
+        setNow(Date.now());
+    }, []);
 
     React.useEffect(() => {
         if (currentCompany?.id) {
             fetchStatus(currentCompany.id);
+            fetchQuickBooksStatus(currentCompany.id);
         }
-    }, [currentCompany?.id, fetchStatus]);
+    }, [currentCompany?.id, fetchQuickBooksStatus, fetchStatus]);
 
     return (
         <div className="p-8">
@@ -79,11 +56,26 @@ export default function Integrations() {
                     <section className="space-y-4">
                         {INTEGRATION_SERVICES.map((service) => {
                             const Icon = service.icon;
+                            const isConnected =
+                                service.slug === "zoho-books"
+                                    ? zohoConnected
+                                    : service.slug === "quickbooks"
+                                        ? quickBooksConnected
+                                        : false;
                             const badge = service.comingSoon
                                 ? { label: "Coming Soon", variant: "gray" as const }
-                                : zohoConnected
-                                    ? { label: "Connected", variant: "success" as const }
-                                    : { label: "Not Connected", variant: "gray" as const };
+                                : service.slug === "quickbooks" && quickBooksNeedsReconnect
+                                    ? { label: "Reconnect Required", variant: "warning" as const }
+                                    : isConnected
+                                        ? { label: "Connected", variant: "success" as const }
+                                        : { label: "Not Connected", variant: "gray" as const };
+                            const actionLabel = service.comingSoon
+                                ? "Connect"
+                                : service.slug === "quickbooks" && quickBooksNeedsReconnect
+                                    ? "Reconnect"
+                                    : isConnected
+                                        ? "Manage"
+                                        : "Connect";
                             return (
                                 <div
                                     key={service.slug}
@@ -107,7 +99,7 @@ export default function Integrations() {
                                         disabled={service.comingSoon}
                                         onClick={() => navigate(`/dashboard/integrations/${service.slug}`)}
                                     >
-                                        Connect
+                                        {actionLabel}
                                     </Button>
                                 </div>
                             );
