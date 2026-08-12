@@ -6,6 +6,7 @@ import { Plug } from "lucide-react";
 import { useCompanyStore } from "../store/companyStore";
 import { useZohoBooksStore } from "../store/zohoBooksStore";
 import { useQuickBooksStore } from "../store/quickBooksStore";
+import { useXeroStore } from "../store/xeroStore";
 import { INTEGRATION_SERVICES } from "../lib/integrations";
 
 export default function Integrations() {
@@ -17,9 +18,16 @@ export default function Integrations() {
         expiresAt: quickBooksExpiresAt,
         fetchStatus: fetchQuickBooksStatus
     } = useQuickBooksStore();
+    const {
+        connected: xeroConnected,
+        expiresAt: xeroExpiresAt,
+        fetchStatus: fetchXeroStatus
+    } = useXeroStore();
     const [now, setNow] = React.useState<number | null>(null);
     const quickBooksNeedsReconnect =
         Boolean(now && quickBooksConnected && quickBooksExpiresAt && new Date(quickBooksExpiresAt).getTime() <= now);
+    const xeroNeedsReconnect =
+        Boolean(now && xeroConnected && xeroExpiresAt && new Date(xeroExpiresAt).getTime() <= now);
 
     React.useEffect(() => {
         setNow(Date.now());
@@ -29,8 +37,9 @@ export default function Integrations() {
         if (currentCompany?.id) {
             fetchStatus(currentCompany.id);
             fetchQuickBooksStatus(currentCompany.id);
+            fetchXeroStatus(currentCompany.id);
         }
-    }, [currentCompany?.id, fetchQuickBooksStatus, fetchStatus]);
+    }, [currentCompany?.id, fetchQuickBooksStatus, fetchStatus, fetchXeroStatus]);
 
     return (
         <div className="p-8">
@@ -61,17 +70,25 @@ export default function Integrations() {
                                     ? zohoConnected
                                     : service.slug === "quickbooks"
                                         ? quickBooksConnected
+                                        : service.slug === "xero"
+                                            ? xeroConnected
+                                        : false;
+                            const needsReconnect =
+                                service.slug === "quickbooks"
+                                    ? quickBooksNeedsReconnect
+                                    : service.slug === "xero"
+                                        ? xeroNeedsReconnect
                                         : false;
                             const badge = service.comingSoon
                                 ? { label: "Coming Soon", variant: "gray" as const }
-                                : service.slug === "quickbooks" && quickBooksNeedsReconnect
+                                : needsReconnect
                                     ? { label: "Reconnect Required", variant: "warning" as const }
                                     : isConnected
                                         ? { label: "Connected", variant: "success" as const }
                                         : { label: "Not Connected", variant: "gray" as const };
                             const actionLabel = service.comingSoon
                                 ? "Connect"
-                                : service.slug === "quickbooks" && quickBooksNeedsReconnect
+                                : needsReconnect
                                     ? "Reconnect"
                                     : isConnected
                                         ? "Manage"

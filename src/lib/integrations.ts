@@ -27,6 +27,5 @@ export const INTEGRATION_SERVICES: IntegrationService[] = [
         name: "Xero",
         description: "Sync invoices from Xero",
         icon: Landmark,
-        comingSoon: true,
     },
 ];

@@ -4,13 +4,16 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { useToast } from "../components/ui/Toast";
+import { Select } from "../components/ui/Select";
+import { Toggle } from "../components/ui/Toggle";
 import { useCompanyStore } from "../store/companyStore";
 import { useZohoBooksStore, type ZohoJobStatus } from "../store/zohoBooksStore";
 import { useQuickBooksStore, type QuickBooksJobStatus } from "../store/quickBooksStore";
+import { useXeroStore, type XeroJobStatus } from "../store/xeroStore";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { INTEGRATION_SERVICES } from "../lib/integrations";
 
-const JOB_STATUS_BADGE: Record<ZohoJobStatus | QuickBooksJobStatus, { label: string; variant: "gray" | "success" | "warning" | "danger" | "primary" }> = {
+const JOB_STATUS_BADGE: Record<ZohoJobStatus | QuickBooksJobStatus | XeroJobStatus, { label: string; variant: "gray" | "success" | "warning" | "danger" | "primary" }> = {
     imported: { label: "Imported", variant: "gray" },
     submitted: { label: "Submitted", variant: "primary" },
     processing: { label: "Processing", variant: "warning" },
@@ -35,6 +38,7 @@ export default function IntegrationDetail() {
     const Icon = integration?.icon;
     const isZohoBooks = service === "zoho-books";
     const isQuickBooks = service === "quickbooks";
+    const isXero = service === "xero";
 
     return (
         <div className="p-8">
@@ -74,6 +78,12 @@ export default function IntegrationDetail() {
                             setSearchParams={setSearchParams}
                             toast={toast}
                         />
+                    ) : isXero ? (
+                        <XeroPanel
+                            searchParams={searchParams}
+                            setSearchParams={setSearchParams}
+                            toast={toast}
+                        />
                     ) : integration ? (
                         <div className="rounded-xl border border-dashed border-surface-200 p-8 text-center space-y-2">
                             <Badge variant="gray">Coming Soon</Badge>
@@ -105,6 +115,7 @@ function ZohoBooksPanel({
         lastSyncedAt,
         environment,
         connectedAt,
+        pollingEnabled,
         message,
         isLoading,
         isSyncing,
@@ -113,6 +124,7 @@ function ZohoBooksPanel({
         fetchStatus,
         connect,
         disconnect,
+        updatePolling,
         sync,
         fetchJobs,
     } = useZohoBooksStore();
@@ -202,6 +214,25 @@ function ZohoBooksPanel({
         }
     };
 
+    const handlePollingToggle = async (enabled: boolean) => {
+        try {
+            await updatePolling(companyId, enabled);
+            toast({
+                title: enabled ? "Auto-sync enabled" : "Auto-sync paused",
+                description: enabled
+                    ? "Zoho Books will be checked by the scheduled poller."
+                    : "Scheduled Zoho Books polling is paused. Manual sync still works.",
+                variant: "success",
+            });
+        } catch {
+            toast({
+                title: "Couldn't update auto-sync",
+                description: error || "Failed to update Zoho Books auto-sync.",
+                variant: "error",
+            });
+        }
+    };
+
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between p-4 rounded-xl border border-surface-100">
@@ -249,6 +280,22 @@ function ZohoBooksPanel({
                     </Button>
                 )}
             </div>
+
+            {connected && (
+                <div className="flex items-center justify-between rounded-xl border border-surface-100 p-4">
+                    <div>
+                        <p className="text-sm font-bold text-surface-900">Auto-sync invoices</p>
+                        <p className="text-xs text-surface-900/60">
+                            Scheduled polling refreshes tokens as needed and pulls newly changed invoices.
+                        </p>
+                    </div>
+                    <Toggle
+                        checked={pollingEnabled}
+                        onToggleChange={handlePollingToggle}
+                        disabled={isLoading}
+                    />
+                </div>
+            )}
 
             {connected && (
                 <dl className="grid grid-cols-2 gap-4 text-sm">
@@ -332,6 +379,7 @@ function QuickBooksPanel({
         environment,
         expiresAt,
         connectedAt,
+        pollingEnabled,
         message,
         isLoading,
         isSyncing,
@@ -340,6 +388,7 @@ function QuickBooksPanel({
         fetchStatus,
         connect,
         disconnect,
+        updatePolling,
         sync,
         fetchJobs,
     } = useQuickBooksStore();
@@ -434,6 +483,25 @@ function QuickBooksPanel({
         }
     };
 
+    const handlePollingToggle = async (enabled: boolean) => {
+        try {
+            await updatePolling(companyId, enabled);
+            toast({
+                title: enabled ? "Auto-sync enabled" : "Auto-sync paused",
+                description: enabled
+                    ? "QuickBooks will be checked by the scheduled poller."
+                    : "Scheduled QuickBooks polling is paused. Manual sync still works.",
+                variant: "success",
+            });
+        } catch {
+            toast({
+                title: "Couldn't update auto-sync",
+                description: error || "Failed to update QuickBooks auto-sync.",
+                variant: "error",
+            });
+        }
+    };
+
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between p-4 rounded-xl border border-surface-100">
@@ -508,6 +576,22 @@ function QuickBooksPanel({
             </div>
 
             {connected && (
+                <div className="flex items-center justify-between rounded-xl border border-surface-100 p-4">
+                    <div>
+                        <p className="text-sm font-bold text-surface-900">Auto-sync invoices</p>
+                        <p className="text-xs text-surface-900/60">
+                            Scheduled polling refreshes tokens as needed and pulls newly changed invoices.
+                        </p>
+                    </div>
+                    <Toggle
+                        checked={pollingEnabled}
+                        onToggleChange={handlePollingToggle}
+                        disabled={isLoading || needsReconnect}
+                    />
+                </div>
+            )}
+
+            {connected && (
                 <dl className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                         <dt className="text-surface-900/50 text-xs font-medium">Realm ID</dt>
@@ -567,6 +651,366 @@ function QuickBooksPanel({
                 onConfirm={handleDisconnect}
                 title="Disconnect QuickBooks?"
                 description="This will stop syncing invoices from QuickBooks for this company. You can reconnect at any time."
+                confirmText="Disconnect"
+                variant="danger"
+            />
+        </div>
+    );
+}
+
+function XeroPanel({
+    searchParams,
+    setSearchParams,
+    toast,
+}: {
+    searchParams: URLSearchParams;
+    setSearchParams: (params: URLSearchParams, opts?: { replace?: boolean }) => void;
+    toast: ReturnType<typeof useToast>["toast"];
+}) {
+    const { currentCompany } = useCompanyStore();
+    const {
+        connected,
+        configured,
+        tenantId,
+        tenantName,
+        apiBaseUrl,
+        lastSyncedAt,
+        environment,
+        expiresAt,
+        connectedAt,
+        pollingEnabled,
+        message,
+        tenants,
+        isLoading,
+        isSyncing,
+        isLoadingTenants,
+        error,
+        jobs,
+        fetchStatus,
+        connect,
+        disconnect,
+        updatePolling,
+        sync,
+        fetchTenants,
+        setTenant,
+        fetchJobs,
+    } = useXeroStore();
+
+    const [showDisconnectConfirm, setShowDisconnectConfirm] = React.useState(false);
+    const [now, setNow] = React.useState<number | null>(null);
+    const companyId = currentCompany?.id;
+    const needsReconnect = Boolean(
+        now && connected && expiresAt && new Date(expiresAt).getTime() <= now
+    );
+
+    React.useEffect(() => {
+        setNow(Date.now());
+    }, []);
+
+    React.useEffect(() => {
+        if (!companyId) return;
+        fetchStatus(companyId);
+        fetchJobs(companyId, 1, 5);
+    }, [companyId, fetchJobs, fetchStatus]);
+
+    React.useEffect(() => {
+        if (!companyId || !connected) return;
+        fetchTenants(companyId);
+    }, [companyId, connected, fetchTenants]);
+
+    const handledXeroParamRef = React.useRef<string | null>(null);
+    React.useEffect(() => {
+        const xeroParam = searchParams.get("xero");
+        if (!xeroParam || handledXeroParamRef.current === xeroParam) return;
+        handledXeroParamRef.current = xeroParam;
+
+        if (xeroParam === "connected") {
+            toast({
+                title: "Xero connected",
+                description: "Your Xero organisation is now linked.",
+                variant: "success",
+            });
+            setSearchParams(new URLSearchParams(), { replace: true });
+            if (companyId) {
+                fetchStatus(companyId);
+                fetchTenants(companyId);
+            }
+        } else if (xeroParam === "error") {
+            toast({
+                title: "Couldn't connect Xero",
+                description: searchParams.get("message") || "Something went wrong finishing the Xero connection.",
+                variant: "error",
+                duration: 8000,
+            });
+            setSearchParams(new URLSearchParams(), { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
+    if (!companyId) {
+        return (
+            <p className="text-sm text-surface-900/70">
+                No company selected yet. Complete onboarding to connect Xero.
+            </p>
+        );
+    }
+
+    const handleConnect = async () => {
+        try {
+            await connect(companyId);
+        } catch {
+            toast({
+                title: "Couldn't start connection",
+                description: error || "Failed to start the Xero connection.",
+                variant: "error",
+            });
+        }
+    };
+
+    const handleDisconnect = async () => {
+        try {
+            await disconnect(companyId);
+            toast({ title: "Xero disconnected", variant: "default" });
+        } catch {
+            toast({
+                title: "Couldn't disconnect",
+                description: error || "Failed to disconnect Xero.",
+                variant: "error",
+            });
+        }
+    };
+
+    const handleSync = async () => {
+        try {
+            await sync(companyId);
+            toast({ title: "Sync started", description: "Pulling recent invoices from Xero.", variant: "success" });
+            fetchJobs(companyId, 1, 5);
+        } catch {
+            toast({
+                title: "Sync failed",
+                description: error || "Failed to sync Xero invoices.",
+                variant: "error",
+            });
+        }
+    };
+
+    const handlePollingToggle = async (enabled: boolean) => {
+        try {
+            await updatePolling(companyId, enabled);
+            toast({
+                title: enabled ? "Auto-sync enabled" : "Auto-sync paused",
+                description: enabled
+                    ? "Xero will be checked by the scheduled poller."
+                    : "Scheduled Xero polling is paused. Manual sync still works.",
+                variant: "success",
+            });
+        } catch {
+            toast({
+                title: "Couldn't update auto-sync",
+                description: error || "Failed to update Xero auto-sync.",
+                variant: "error",
+            });
+        }
+    };
+
+    const handleTenantChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedTenantId = event.target.value;
+        const tenant = tenants.find((item) => item.tenantId === selectedTenantId);
+        if (!tenant) return;
+
+        try {
+            await setTenant(companyId, tenant);
+            toast({
+                title: "Xero organisation updated",
+                description: tenant.tenantName || tenant.tenantId,
+                variant: "success",
+            });
+        } catch {
+            toast({
+                title: "Couldn't update organisation",
+                description: error || "Failed to update the selected Xero organisation.",
+                variant: "error",
+            });
+        }
+    };
+
+    return (
+        <div className="space-y-8">
+            <div className="flex items-center justify-between p-4 rounded-xl border border-surface-100">
+                <div className="flex items-center gap-3">
+                    <Badge variant={needsReconnect ? "warning" : connected ? "success" : "gray"}>
+                        {needsReconnect ? "Reconnect Required" : connected ? "Connected" : "Not Connected"}
+                    </Badge>
+                    {!connected && !configured && (
+                        <span className="text-xs text-surface-900/70 font-medium">
+                            {message || "Xero isn't configured on the backend yet."}
+                        </span>
+                    )}
+                    {connected && apiBaseUrl && (
+                        <span className="text-xs text-surface-900/60 font-medium">
+                            {apiBaseUrl.replace(/^https?:\/\//, "")}
+                        </span>
+                    )}
+                </div>
+                {connected && !needsReconnect ? (
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 font-bold"
+                            onClick={handleSync}
+                            isLoading={isSyncing}
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Sync Now
+                        </Button>
+                        <Button
+                            variant="danger"
+                            size="sm"
+                            className="font-bold"
+                            onClick={() => setShowDisconnectConfirm(true)}
+                        >
+                            Disconnect
+                        </Button>
+                    </div>
+                ) : connected && needsReconnect ? (
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            className="font-bold"
+                            onClick={handleConnect}
+                            isLoading={isLoading}
+                        >
+                            Reconnect
+                        </Button>
+                        <Button
+                            variant="danger"
+                            size="sm"
+                            className="font-bold"
+                            onClick={() => setShowDisconnectConfirm(true)}
+                        >
+                            Disconnect
+                        </Button>
+                    </div>
+                ) : (
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        className="font-bold"
+                        onClick={handleConnect}
+                        isLoading={isLoading}
+                        disabled={!configured && !connected}
+                    >
+                        Connect
+                    </Button>
+                )}
+            </div>
+
+            {connected && (
+                <section className="space-y-3">
+                    <div className="space-y-1">
+                        <h3 className="text-sm font-bold text-surface-900">Organisation</h3>
+                        <p className="text-xs text-surface-900/60">
+                            Choose the Xero organisation this company should sync from.
+                        </p>
+                    </div>
+                    {tenants.length > 1 ? (
+                        <Select
+                            value={tenantId || ""}
+                            onChange={handleTenantChange}
+                            disabled={isLoadingTenants}
+                        >
+                            {tenants.map((tenant) => (
+                                <option key={tenant.tenantId} value={tenant.tenantId}>
+                                    {tenant.tenantName || tenant.tenantId}
+                                </option>
+                            ))}
+                        </Select>
+                    ) : (
+                        <div className="rounded-lg border border-surface-100 p-3 text-sm">
+                            <span className="font-bold text-surface-900">{tenantName || tenantId || "—"}</span>
+                        </div>
+                    )}
+                </section>
+            )}
+
+            {connected && (
+                <div className="flex items-center justify-between rounded-xl border border-surface-100 p-4">
+                    <div>
+                        <p className="text-sm font-bold text-surface-900">Auto-sync invoices</p>
+                        <p className="text-xs text-surface-900/60">
+                            Scheduled polling refreshes tokens as needed and pulls newly changed invoices.
+                        </p>
+                    </div>
+                    <Toggle
+                        checked={pollingEnabled}
+                        onToggleChange={handlePollingToggle}
+                        disabled={isLoading || needsReconnect}
+                    />
+                </div>
+            )}
+
+            {connected && (
+                <dl className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <dt className="text-surface-900/50 text-xs font-medium">Tenant ID</dt>
+                        <dd className="font-bold text-surface-900">{tenantId || "—"}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-surface-900/50 text-xs font-medium">Environment</dt>
+                        <dd className="font-bold text-surface-900 capitalize">{environment || "—"}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-surface-900/50 text-xs font-medium">Connected Since</dt>
+                        <dd className="font-bold text-surface-900">{formatDate(connectedAt)}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-surface-900/50 text-xs font-medium">Last Synced</dt>
+                        <dd className="font-bold text-surface-900">{formatDate(lastSyncedAt)}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-surface-900/50 text-xs font-medium">Token Expires</dt>
+                        <dd className="font-bold text-surface-900">{formatDate(expiresAt)}</dd>
+                    </div>
+                </dl>
+            )}
+
+            {connected && (
+                <section className="space-y-3">
+                    <h3 className="text-sm font-bold text-surface-900">Recent Invoice Jobs</h3>
+                    {jobs.length === 0 ? (
+                        <p className="text-xs text-surface-900/70">No invoice jobs yet. Run a sync to pull recent invoices.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {jobs.map((job) => {
+                                const statusInfo = JOB_STATUS_BADGE[job.status] || { label: job.status, variant: "gray" as const };
+                                return (
+                                    <div
+                                        key={job.id}
+                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm"
+                                    >
+                                        <span className="font-medium text-surface-900">
+                                            {job.xeroInvoiceNumber || job.xeroInvoiceId}
+                                        </span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs text-surface-900/50">{formatDate(job.updatedAt)}</span>
+                                            <Badge variant={statusInfo.variant} size="sm">{statusInfo.label}</Badge>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </section>
+            )}
+
+            <ConfirmModal
+                isOpen={showDisconnectConfirm}
+                onClose={() => setShowDisconnectConfirm(false)}
+                onConfirm={handleDisconnect}
+                title="Disconnect Xero?"
+                description="This will stop syncing invoices from Xero for this company. You can reconnect at any time."
                 confirmText="Disconnect"
                 variant="danger"
             />

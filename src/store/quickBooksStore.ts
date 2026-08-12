@@ -27,6 +27,8 @@ export interface QuickBooksJob {
     environment: string;
     status: QuickBooksJobStatus;
     error: string | null;
+    sourcePayload?: Record<string, unknown> | null;
+    processedPayload?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -53,6 +55,7 @@ interface QuickBooksState {
     fetchStatus: (companyId: string) => Promise<void>;
     connect: (companyId: string) => Promise<void>;
     disconnect: (companyId: string) => Promise<void>;
+    updatePolling: (companyId: string, pollingEnabled: boolean) => Promise<void>;
     sync: (companyId: string) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
 }
@@ -130,6 +133,20 @@ export const useQuickBooksStore = create<QuickBooksState>()((set) => ({
             });
         } catch (error) {
             set({ error: (error as ApiError).response?.data?.message || 'Failed to disconnect QuickBooks' });
+            throw error;
+        } finally {
+            set({ isLoading: false });
+        }
+    },
+
+    updatePolling: async (companyId, pollingEnabled) => {
+        set({ isLoading: true, error: null });
+        try {
+            const response = await api.patch(`/quickbooks/${companyId}/polling`, { pollingEnabled });
+            const result = response.data.data || response.data;
+            set({ pollingEnabled: Boolean(result?.pollingEnabled) });
+        } catch (error) {
+            set({ error: (error as ApiError).response?.data?.message || 'Failed to update QuickBooks polling' });
             throw error;
         } finally {
             set({ isLoading: false });

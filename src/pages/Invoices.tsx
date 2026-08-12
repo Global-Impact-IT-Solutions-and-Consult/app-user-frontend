@@ -14,26 +14,170 @@ import {
     ChevronRight
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useCompanyStore } from "../store/companyStore";
 import { useReceiptStore } from "../store/receiptStore";
+import { useZohoBooksStore, type ZohoJob } from "../store/zohoBooksStore";
+import { useQuickBooksStore, type QuickBooksJob } from "../store/quickBooksStore";
+import { useXeroStore, type XeroJob } from "../store/xeroStore";
 
 const tabs = [
-    { label: "All Invoices", count: 10, id: "all" },
-    { label: "Sent", count: 5, id: "sent" },
-    { label: "Received", count: 5, id: "received" },
-    { label: "Pending", count: 3, id: "pending" },
-    { label: "Failed", count: 1, id: "failed" },
+    { label: "All Invoices", id: "all" },
+    { label: "Sent", id: "sent" },
+    { label: "Received", id: "received" },
+    { label: "Pending", id: "pending" },
+    { label: "Failed", id: "failed" },
 ];
 
+const statusOptions = [
+    "All Statuses",
+    "Imported",
+    "Submitted",
+    "Processing",
+    "Processed",
+    "Completed",
+    "Failed",
+];
 
+type InvoiceRow = {
+    id: string;
+    receiptId?: string | null;
+    source: "receipt" | "zoho-books" | "quickbooks" | "xero";
+    type: "sent" | "received";
+    invoiceId: string;
+    issueDate: string | null;
+    counterpartyName: string;
+    totalAmount: number | null;
+    currency: string;
+    status: string;
+    updatedAt: string | null;
+    route?: string;
+};
+
+type ReceiptLike = {
+    id: string;
+    receiptNumber?: string;
+    issueDate?: string;
+    totalAmount?: number;
+    currency?: string;
+    status?: string;
+    type?: "sent" | "received";
+    counterpartyName?: string;
+};
+
+function getString(payload: Record<string, unknown> | null | undefined, keys: string[]) {
+    for (const key of keys) {
+        const value = payload?.[key];
+        if (typeof value === "string" && value.trim()) return value;
+        if (typeof value === "number") return String(value);
+        if (value && typeof value === "object") {
+            const nested = value as Record<string, unknown>;
+            for (const nestedKey of ["name", "Name", "value", "Value"]) {
+                const nestedValue = nested[nestedKey];
+                if (typeof nestedValue === "string" && nestedValue.trim()) return nestedValue;
+            }
+        }
+    }
+    return "";
+}
+
+function getNumber(payload: Record<string, unknown> | null | undefined, keys: string[]) {
+    for (const key of keys) {
+        const value = payload?.[key];
+        if (typeof value === "number") return value;
+        if (typeof value === "string" && value.trim() && !Number.isNaN(Number(value))) return Number(value);
+    }
+    return null;
+}
+
+function normalizeStatus(status: string) {
+    return status.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function statusVariant(status: string): "primary" | "success" | "warning" | "danger" | "gray" {
+    const value = status.toLowerCase();
+    if (value === "failed") return "danger";
+    if (["completed", "processed"].includes(value)) return "success";
+    if (["processing", "writeback_pending", "imported"].includes(value)) return "warning";
+    if (value === "submitted") return "primary";
+    return "gray";
+}
+
+function sourceName(source: InvoiceRow["source"]) {
+    if (source === "zoho-books") return "Zoho Books";
+    if (source === "quickbooks") return "QuickBooks";
+    if (source === "xero") return "Xero";
+    return "Receipt Service";
+}
+
+function normalizeReceipt(receipt: ReceiptLike): InvoiceRow {
+    return {
+        id: `receipt:${receipt.id}`,
+        receiptId: receipt.id,
+        source: "receipt",
+        type: receipt.type || "received",
+        invoiceId: receipt.receiptNumber || receipt.id,
+        issueDate: receipt.issueDate || null,
+        counterpartyName: receipt.counterpartyName || "Unknown",
+        totalAmount: typeof receipt.totalAmount === "number" ? receipt.totalAmount : null,
+        currency: receipt.currency || "",
+        status: receipt.status || "received",
+        updatedAt: receipt.issueDate || null,
+        route: `/dashboard/invoices/${receipt.id}`,
+    };
+}
+
+function normalizeProviderJob(job: ZohoJob | QuickBooksJob | XeroJob, source: "zoho-books" | "quickbooks" | "xero"): InvoiceRow {
+    const payload = job.sourcePayload || null;
+    const invoiceId =
+        source === "zoho-books"
+            ? (job as ZohoJob).zohoInvoiceNumber || (job as ZohoJob).zohoInvoiceId
+            : source === "quickbooks"
+                ? (job as QuickBooksJob).quickbooksInvoiceNumber || (job as QuickBooksJob).quickbooksInvoiceId
+                : (job as XeroJob).xeroInvoiceNumber || (job as XeroJob).xeroInvoiceId;
+
+    return {
+        id: `${source}:${job.id}`,
+        receiptId: job.receiptId,
+        source,
+        type: "received",
+        invoiceId,
+        issueDate: getString(payload, ["date", "Date", "TxnDate", "InvoiceDate", "invoice_date"]) || job.createdAt || null,
+        counterpartyName: getString(payload, ["customer_name", "CustomerRef", "Contact", "contact_name", "Name"]) || sourceName(source),
+        totalAmount: getNumber(payload, ["total", "TotalAmt", "Total", "AmountDue", "amount_due"]),
+        currency: getString(payload, ["currency_code", "CurrencyRef", "CurrencyCode"]) || "",
+        status: job.status,
+        updatedAt: job.updatedAt,
+        route: job.receiptId ? `/dashboard/invoices/${job.receiptId}` : undefined,
+    };
+}
+
+function formatAmount(row: InvoiceRow) {
+    if (row.totalAmount === null) return "—";
+    return `${row.currency} ${row.totalAmount.toLocaleString()}`.trim();
+}
+
+function getDateFromRange(dateRange: string) {
+    const now = new Date();
+    if (dateRange === "Last 7 Days") {
+        return new Date(now.setDate(now.getDate() - 7));
+    }
+    if (dateRange === "Last 30 Days") {
+        return new Date(now.setDate(now.getDate() - 30));
+    }
+    return null;
+}
 
 export default function Invoices() {
     const navigate = useNavigate();
+    const { currentCompany } = useCompanyStore();
     const {
         receipts,
-        totalReceipts,
         isLoading,
         fetchReceipts
     } = useReceiptStore();
+    const { jobs: zohoJobs, fetchJobs: fetchZohoJobs } = useZohoBooksStore();
+    const { jobs: quickBooksJobs, fetchJobs: fetchQuickBooksJobs } = useQuickBooksStore();
+    const { jobs: xeroJobs, fetchJobs: fetchXeroJobs } = useXeroStore();
 
     const [activeTab, setActiveTab] = React.useState("all");
     const [searchQuery, setSearchQuery] = React.useState("");
@@ -56,61 +200,80 @@ export default function Invoices() {
             limit,
         };
 
-        if (activeTab !== 'all') {
-            // Type filtering Logic
-        }
-
         if (searchQuery) {
             params.search = searchQuery;
         }
 
-        if (statusFilter !== "All Statuses") {
-            // Status filtering Logic
-        }
-
-        if (dateRange !== "All Time") {
-            const now = new Date();
-            if (dateRange === "Last 7 Days") {
-                const past = new Date(now.setDate(now.getDate() - 7));
-                params.dateFrom = past.toISOString();
-            } else if (dateRange === "Last 30 Days") {
-                const past = new Date(now.setDate(now.getDate() - 30));
-                params.dateFrom = past.toISOString();
-            }
+        const dateFrom = getDateFromRange(dateRange);
+        if (dateFrom) {
+            params.dateFrom = dateFrom.toISOString();
         }
 
         fetchReceipts(params);
-    }, [activeTab, searchQuery, statusFilter, dateRange, page, fetchReceipts]);
+    }, [searchQuery, dateRange, page, fetchReceipts]);
+
+    React.useEffect(() => {
+        if (!currentCompany?.id) return;
+        fetchZohoJobs(currentCompany.id, 1, 100);
+        fetchQuickBooksJobs(currentCompany.id, 1, 100);
+        fetchXeroJobs(currentCompany.id, 1, 100);
+    }, [currentCompany?.id, fetchQuickBooksJobs, fetchXeroJobs, fetchZohoJobs]);
 
     const handleClearFilters = () => {
         setSearchQuery("");
         setStatusFilter("All Statuses");
         setDateRange("All Time");
         setActiveTab("all");
+        setPage(1);
     };
 
-    // Client-side filtering fallback
     const displayedReceipts = React.useMemo(() => {
-        return receipts.filter(r => {
-            if (activeTab === 'sent' && r.type !== 'sent') return false;
-            if (activeTab === 'received' && r.type !== 'received') return false;
-            if (activeTab === 'pending' && r.status !== 'processing') return false;
-            if (activeTab === 'failed' && r.status !== 'failed') return false;
+        const rowsById = new Map<string, InvoiceRow>();
+        const receiptRows = receipts.map((receipt) => normalizeReceipt(receipt));
+        const providerRows = [
+            ...zohoJobs.map((job) => normalizeProviderJob(job, "zoho-books")),
+            ...quickBooksJobs.map((job) => normalizeProviderJob(job, "quickbooks")),
+            ...xeroJobs.map((job) => normalizeProviderJob(job, "xero")),
+        ];
 
-            if (statusFilter !== "All Statuses" && r.status !== statusFilter) return false;
+        for (const row of [...receiptRows, ...providerRows]) {
+            const key = row.receiptId || row.id;
+            if (!rowsById.has(key)) rowsById.set(key, row);
+        }
+
+        return Array.from(rowsById.values()).filter(row => {
+            const normalizedStatus = row.status.toLowerCase();
+            const dateFrom = getDateFromRange(dateRange);
+            if (activeTab === "sent" && row.type !== "sent") return false;
+            if (activeTab === "received" && row.type !== "received") return false;
+            if (activeTab === "pending" && !["processing", "imported", "submitted", "writeback_pending"].includes(normalizedStatus)) return false;
+            if (activeTab === "failed" && normalizedStatus !== "failed") return false;
+            if (dateFrom && new Date(row.updatedAt || row.issueDate || 0) < dateFrom) return false;
+
+            if (statusFilter !== "All Statuses" && normalizeStatus(row.status) !== statusFilter) return false;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                if (!`${row.invoiceId} ${row.counterpartyName} ${sourceName(row.source)}`.toLowerCase().includes(q)) return false;
+            }
 
             return true;
-        });
-    }, [receipts, activeTab, statusFilter]);
+        }).sort((a, b) => new Date(b.updatedAt || b.issueDate || 0).getTime() - new Date(a.updatedAt || a.issueDate || 0).getTime());
+    }, [receipts, zohoJobs, quickBooksJobs, xeroJobs, activeTab, statusFilter, searchQuery, dateRange]);
+
+    const displayedTotal = displayedReceipts.length;
+    const pageRows = displayedReceipts.slice((page - 1) * limit, page * limit);
+
+    React.useEffect(() => {
+        setPage(1);
+    }, [activeTab, statusFilter, searchQuery, dateRange]);
 
     return (
         <div className="p-8 space-y-8">
-            {/* Header omitted for brevity in chunk but should match */}
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div className="space-y-1">
                     <h1 className="text-3xl font-bold text-surface-900 font-serif">Invoices</h1>
                     <p className="text-surface-900/70 text-sm">
-                        Manage all sent and received invoices
+                        Manage synced, submitted, and processed invoices
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -125,7 +288,6 @@ export default function Invoices() {
                 </div>
             </header>
 
-            {/* Filters */}
             <section className="bg-white p-6 rounded-2xl border border-surface-200">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                     <Select
@@ -133,11 +295,9 @@ export default function Invoices() {
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
-                        <option>All Statuses</option>
-                        <option>Cleared</option>
-                        <option>Sent to NRS</option>
-                        <option>Processing</option>
-                        <option>Downloaded</option>
+                        {statusOptions.map((option) => (
+                            <option key={option}>{option}</option>
+                        ))}
                     </Select>
                     <Select
                         label="Date Range"
@@ -152,7 +312,7 @@ export default function Invoices() {
                         <label className="text-sm font-medium text-surface-900 uppercase tracking-wider">Search</label>
                         <div className="flex gap-3">
                             <Input
-                                placeholder="Invoice ID or Counterparty"
+                                placeholder="Invoice ID, counterparty, or source"
                                 icon={<Search className="h-4 w-4" />}
                                 className="flex-1"
                                 value={searchQuery}
@@ -170,7 +330,6 @@ export default function Invoices() {
                 </div>
             </section>
 
-            {/* Tabs */}
             <div className="flex gap-4 border-b border-surface-200">
                 {tabs.map((tab) => (
                     <button
@@ -188,7 +347,6 @@ export default function Invoices() {
                 ))}
             </div>
 
-            {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-surface-200 bg-white shadow-sm">
                 <table className="w-full text-left text-sm border-collapse">
                     <thead>
@@ -196,7 +354,7 @@ export default function Invoices() {
                             <th className="px-6 py-4 w-4">
                                 <input type="checkbox" className="rounded border-surface-300" />
                             </th>
-                            <th className="px-6 py-4 font-bold text-surface-900/70 uppercase tracking-wider text-[10px]">Type</th>
+                            <th className="px-6 py-4 font-bold text-surface-900/70 uppercase tracking-wider text-[10px]">Source</th>
                             <th className="px-6 py-4 font-bold text-surface-900/70 uppercase tracking-wider text-[10px]">Invoice ID</th>
                             <th className="px-6 py-4 font-bold text-surface-900/70 uppercase tracking-wider text-[10px]">Date</th>
                             <th className="px-6 py-4 font-bold text-surface-900/70 uppercase tracking-wider text-[10px]">Counterparty</th>
@@ -212,18 +370,21 @@ export default function Invoices() {
                                     Loading invoices...
                                 </td>
                             </tr>
-                        ) : displayedReceipts.length === 0 ? (
+                        ) : pageRows.length === 0 ? (
                             <tr>
                                 <td colSpan={8} className="px-6 py-12 text-center text-surface-500">
                                     No invoices found.
                                 </td>
                             </tr>
                         ) : (
-                            displayedReceipts.map((activity, index) => (
+                            pageRows.map((activity) => (
                                 <tr
-                                    key={index}
-                                    className="hover:bg-surface-50/50 transition-colors cursor-pointer"
-                                    onClick={() => navigate(`/dashboard/invoices/${activity.id}`)}
+                                    key={activity.id}
+                                    className={cn(
+                                        "hover:bg-surface-50/50 transition-colors",
+                                        activity.route && "cursor-pointer"
+                                    )}
+                                    onClick={() => activity.route && navigate(activity.route)}
                                 >
                                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                         <input type="checkbox" className="rounded border-surface-300" />
@@ -231,32 +392,37 @@ export default function Invoices() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             <Badge
-                                                variant={activity.type === "sent" ? "primary" : "success"}
+                                                variant={activity.source === "receipt" ? "success" : "primary"}
                                                 size="sm"
                                                 className="font-medium"
                                                 icon={activity.type === "sent" ? <Send className="h-3 w-3" /> : <Download className="h-3 w-3" />}
                                             >
-                                                {activity.type === "sent" ? "Sent" : "Received"}
+                                                {sourceName(activity.source)}
                                             </Badge>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-surface-600">{activity.receiptNumber || activity.id}</td>
+                                    <td className="px-6 py-4 text-surface-600">{activity.invoiceId}</td>
                                     <td className="px-6 py-4 text-surface-600">
-                                        {activity.issueDate ? new Date(activity.issueDate).toLocaleDateString() : 'N/A'}
+                                        {activity.issueDate ? new Date(activity.issueDate).toLocaleDateString() : "N/A"}
                                     </td>
-                                    <td className="px-6 py-4 text-surface-600">{activity.counterpartyName || 'Unknown'}</td>
-                                    <td className="px-6 py-4 text-surface-900">
-                                        {activity.currency} {activity.totalAmount?.toLocaleString()}
-                                    </td>
+                                    <td className="px-6 py-4 text-surface-600">{activity.counterpartyName}</td>
+                                    <td className="px-6 py-4 text-surface-900">{formatAmount(activity)}</td>
                                     <td className="px-6 py-4">
-                                        <Badge variant="primary" size="sm">
-                                            {activity.status}
+                                        <Badge variant={statusVariant(activity.status)} size="sm">
+                                            {normalizeStatus(activity.status)}
                                         </Badge>
                                     </td>
                                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                                        <button className="text-primary-500 font-medium hover:underline">
-                                            View
-                                        </button>
+                                        {activity.route ? (
+                                            <button
+                                                className="text-primary-500 font-medium hover:underline"
+                                                onClick={() => navigate(activity.route!)}
+                                            >
+                                                View
+                                            </button>
+                                        ) : (
+                                            <span className="text-xs text-surface-900/50">Job only</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))
@@ -264,11 +430,10 @@ export default function Invoices() {
                     </tbody>
                 </table>
 
-                {/* Pagination */}
                 <div className="px-6 py-4 bg-surface-50 border-t border-surface-200 flex items-center justify-between">
                     <p className="text-xs text-surface-900/70">
-                        {totalReceipts > 0
-                            ? `Showing ${(page - 1) * limit + 1}-${Math.min(page * limit, totalReceipts)} of ${totalReceipts} invoices`
+                        {displayedTotal > 0
+                            ? `Showing ${(page - 1) * limit + 1}-${Math.min(page * limit, displayedTotal)} of ${displayedTotal} invoices`
                             : "No invoices"}
                     </p>
                     <div className="flex items-center gap-2">
@@ -283,7 +448,7 @@ export default function Invoices() {
                         <button
                             className="p-1 hover:bg-surface-100 rounded text-surface-900/60 disabled:opacity-50"
                             onClick={() => setPage(p => p + 1)}
-                            disabled={page * limit >= totalReceipts}
+                            disabled={page * limit >= displayedTotal}
                         >
                             <ChevronRight className="h-4 w-4" />
                         </button>
@@ -293,4 +458,3 @@ export default function Invoices() {
         </div>
     );
 }
-

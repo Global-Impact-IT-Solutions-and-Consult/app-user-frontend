@@ -9,7 +9,7 @@ interface ApiError {
     };
 }
 
-export type ZohoJobStatus =
+export type XeroJobStatus =
     | 'imported'
     | 'submitted'
     | 'processing'
@@ -18,38 +18,50 @@ export type ZohoJobStatus =
     | 'completed'
     | 'failed';
 
-export interface ZohoJob {
+export interface XeroJob {
     id: string;
     companyId: string;
-    zohoInvoiceId: string;
-    zohoInvoiceNumber: string | null;
+    xeroInvoiceId: string;
+    xeroInvoiceNumber: string | null;
     receiptId: string | null;
     environment: string;
-    status: ZohoJobStatus;
+    status: XeroJobStatus;
     error: string | null;
-    writeBackAt: string | null;
     sourcePayload?: Record<string, unknown> | null;
     processedPayload?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;
 }
 
-interface ZohoBooksState {
+export interface XeroTenant {
+    id?: string;
+    tenantId: string;
+    tenantName?: string | null;
+    tenantType?: string;
+    createdDateUtc?: string;
+    updatedDateUtc?: string;
+}
+
+interface XeroState {
     connected: boolean;
     configured: boolean;
-    organizationId: string | null;
-    apiDomain: string | null;
+    tenantId: string | null;
+    tenantName: string | null;
+    apiBaseUrl: string | null;
     lastSyncedAt: string | null;
     pollingEnabled: boolean;
     environment: string | null;
+    expiresAt: string | null;
     connectedAt: string | null;
     message: string | null;
 
-    jobs: ZohoJob[];
+    tenants: XeroTenant[];
+    jobs: XeroJob[];
     jobsTotal: number;
 
     isLoading: boolean;
     isSyncing: boolean;
+    isLoadingTenants: boolean;
     error: string | null;
 
     fetchStatus: (companyId: string) => Promise<void>;
@@ -57,64 +69,72 @@ interface ZohoBooksState {
     disconnect: (companyId: string) => Promise<void>;
     updatePolling: (companyId: string, pollingEnabled: boolean) => Promise<void>;
     sync: (companyId: string) => Promise<void>;
+    fetchTenants: (companyId: string) => Promise<void>;
+    setTenant: (companyId: string, tenant: XeroTenant) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
 }
 
-export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
+const getErrorMessage = (error: unknown, fallback: string) =>
+    (error as ApiError).response?.data?.message || fallback;
+
+export const useXeroStore = create<XeroState>()((set) => ({
     connected: false,
     configured: false,
-    organizationId: null,
-    apiDomain: null,
+    tenantId: null,
+    tenantName: null,
+    apiBaseUrl: null,
     lastSyncedAt: null,
     pollingEnabled: false,
     environment: null,
+    expiresAt: null,
     connectedAt: null,
     message: null,
 
+    tenants: [],
     jobs: [],
     jobsTotal: 0,
 
     isLoading: false,
     isSyncing: false,
+    isLoadingTenants: false,
     error: null,
 
     fetchStatus: async (companyId) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await api.get(`/zoho-books/${companyId}/status`);
+            const response = await api.get(`/xero/${companyId}/status`);
             const result = response.data.data || response.data;
             set({
                 connected: Boolean(result?.connected),
                 configured: Boolean(result?.configured),
-                organizationId: result?.organizationId || null,
-                apiDomain: result?.apiDomain || null,
+                tenantId: result?.tenantId || null,
+                tenantName: result?.tenantName || null,
+                apiBaseUrl: result?.apiBaseUrl || null,
                 lastSyncedAt: result?.lastSyncedAt || null,
                 pollingEnabled: Boolean(result?.pollingEnabled),
                 environment: result?.environment || null,
+                expiresAt: result?.expiresAt || null,
                 connectedAt: result?.connectedAt || null,
                 message: result?.message || null,
             });
         } catch (error) {
-            set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch Zoho Books status' });
+            set({ error: getErrorMessage(error, 'Failed to fetch Xero status') });
         } finally {
             set({ isLoading: false });
         }
     },
 
-    // Kicks off the OAuth handshake: fetch the authorize URL, then navigate
-    // the whole browser to Zoho (redirects back to /callback on the backend,
-    // which in turn redirects to ZOHO_SUCCESS_REDIRECT_URL on success).
     connect: async (companyId) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await api.get(`/zoho-books/${companyId}/connect`);
+            const response = await api.get(`/xero/${companyId}/connect`);
             const result = response.data.data || response.data;
             if (!result?.url) {
                 throw new Error('No authorization URL returned');
             }
             window.location.href = result.url;
         } catch (error) {
-            set({ error: (error as ApiError).response?.data?.message || 'Failed to start Zoho Books connection', isLoading: false });
+            set({ error: getErrorMessage(error, 'Failed to start Xero connection'), isLoading: false });
             throw error;
         }
     },
@@ -122,17 +142,20 @@ export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
     disconnect: async (companyId) => {
         set({ isLoading: true, error: null });
         try {
-            await api.delete(`/zoho-books/${companyId}/connection`);
+            await api.delete(`/xero/${companyId}/connection`);
             set({
                 connected: false,
-                organizationId: null,
-                apiDomain: null,
+                tenantId: null,
+                tenantName: null,
+                apiBaseUrl: null,
                 lastSyncedAt: null,
                 pollingEnabled: false,
+                expiresAt: null,
                 connectedAt: null,
+                tenants: [],
             });
         } catch (error) {
-            set({ error: (error as ApiError).response?.data?.message || 'Failed to disconnect Zoho Books' });
+            set({ error: getErrorMessage(error, 'Failed to disconnect Xero') });
             throw error;
         } finally {
             set({ isLoading: false });
@@ -142,11 +165,11 @@ export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
     updatePolling: async (companyId, pollingEnabled) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await api.patch(`/zoho-books/${companyId}/polling`, { pollingEnabled });
+            const response = await api.patch(`/xero/${companyId}/polling`, { pollingEnabled });
             const result = response.data.data || response.data;
             set({ pollingEnabled: Boolean(result?.pollingEnabled) });
         } catch (error) {
-            set({ error: (error as ApiError).response?.data?.message || 'Failed to update Zoho Books polling' });
+            set({ error: getErrorMessage(error, 'Failed to update Xero polling') });
             throw error;
         } finally {
             set({ isLoading: false });
@@ -156,28 +179,64 @@ export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
     sync: async (companyId) => {
         set({ isSyncing: true, error: null });
         try {
-            const response = await api.post(`/zoho-books/${companyId}/sync`);
+            const response = await api.post(`/xero/${companyId}/sync`);
             const result = response.data.data || response.data;
             set({ lastSyncedAt: result?.lastSyncedAt || new Date().toISOString() });
         } catch (error) {
-            set({ error: (error as ApiError).response?.data?.message || 'Failed to sync Zoho Books invoices' });
+            set({ error: getErrorMessage(error, 'Failed to sync Xero invoices') });
             throw error;
         } finally {
             set({ isSyncing: false });
         }
     },
 
+    fetchTenants: async (companyId) => {
+        set({ isLoadingTenants: true, error: null });
+        try {
+            const response = await api.get(`/xero/${companyId}/tenants`);
+            const result = response.data.data || response.data;
+            set({
+                tenantId: result?.currentTenantId || null,
+                tenants: Array.isArray(result?.tenants) ? result.tenants : [],
+            });
+        } catch (error) {
+            set({ error: getErrorMessage(error, 'Failed to fetch Xero organisations') });
+        } finally {
+            set({ isLoadingTenants: false });
+        }
+    },
+
+    setTenant: async (companyId, tenant) => {
+        set({ isLoadingTenants: true, error: null });
+        try {
+            const response = await api.put(`/xero/${companyId}/tenant`, {
+                tenantId: tenant.tenantId,
+                tenantName: tenant.tenantName || null,
+            });
+            const result = response.data.data || response.data;
+            set({
+                tenantId: result?.tenantId || tenant.tenantId,
+                tenantName: result?.tenantName || tenant.tenantName || null,
+            });
+        } catch (error) {
+            set({ error: getErrorMessage(error, 'Failed to update Xero organisation') });
+            throw error;
+        } finally {
+            set({ isLoadingTenants: false });
+        }
+    },
+
     fetchJobs: async (companyId, page, perPage) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await api.get(`/zoho-books/${companyId}/jobs`, { params: { page, perPage } });
+            const response = await api.get(`/xero/${companyId}/jobs`, { params: { page, perPage } });
             const result = response.data.data || response.data;
             set({
                 jobs: Array.isArray(result) ? result : result?.items || [],
                 jobsTotal: Array.isArray(result) ? result.length : result?.total || 0,
             });
         } catch (error) {
-            set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch Zoho Books jobs' });
+            set({ error: getErrorMessage(error, 'Failed to fetch Xero jobs') });
         } finally {
             set({ isLoading: false });
         }
