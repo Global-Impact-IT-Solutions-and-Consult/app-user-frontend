@@ -36,8 +36,8 @@ export default function OnboardingFlow() {
         legalName: "",
         businessType: "",
         taxId: "",
-        streetAddress: "",
-        primaryPhone: "",
+        address: "",
+        contactPhone: "",
         contactPerson: "",
         contactEmail: "",
         industry: ""
@@ -56,6 +56,12 @@ export default function OnboardingFlow() {
                 name: companyData.name,
                 legalName: companyData.legalName,
                 taxId: companyData.taxId,
+                businessType: companyData.businessType || undefined,
+                industry: companyData.industry || undefined,
+                address: companyData.address || undefined,
+                contactPerson: companyData.contactPerson || undefined,
+                contactEmail: companyData.contactEmail || undefined,
+                contactPhone: companyData.contactPhone || undefined,
             });
             nextStep(); // Move to success/next step
         } catch {
@@ -169,8 +175,8 @@ function CompanyInfoStep({ data, updateData }: {
         name: string;
         businessType: string;
         taxId: string;
-        streetAddress: string;
-        primaryPhone: string;
+        address: string;
+        contactPhone: string;
         contactPerson: string;
         contactEmail: string;
         industry: string;
@@ -241,16 +247,16 @@ function CompanyInfoStep({ data, updateData }: {
                             <textarea
                                 className="flex min-h-[100px] w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                                 placeholder="Full street address, city, state"
-                                value={data.streetAddress}
-                                onChange={(e) => updateData("streetAddress", e.target.value)}
+                                value={data.address}
+                                onChange={(e) => updateData("address", e.target.value)}
                             />
                         </div>
                         <Input
                             label="Primary Contact Phone"
                             placeholder="+234..."
                             icon={<Phone className="h-4 w-4" />}
-                            value={data.primaryPhone}
-                            onChange={(e) => updateData("primaryPhone", e.target.value)}
+                            value={data.contactPhone}
+                            onChange={(e) => updateData("contactPhone", e.target.value)}
                         />
                         <div className="space-y-2">
                             <Input

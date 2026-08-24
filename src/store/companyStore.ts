@@ -44,6 +44,12 @@ interface Company {
     name: string;
     legalName?: string;
     taxId?: string;
+    businessType?: string;
+    industry?: string;
+    address?: string;
+    contactPerson?: string;
+    contactEmail?: string;
+    contactPhone?: string;
     status: string;
     documents: Record<string, unknown>[];
     error: string | null;
@@ -143,10 +149,17 @@ export const useCompanyStore = create<CompanyState>()(
             updateCompany: async (id, data) => {
                 set({ isLoading: true, error: null });
                 try {
-                    await api.put(`/companies/${id}`, data);
-                    await useCompanyStore.getState().fetchCompanies();
+                    const response = await api.put(`/companies/${id}`, data);
+                    const result = response.data.data || response.data;
+                    set(state => ({
+                        currentCompany: state.currentCompany?.id === id
+                            ? { ...state.currentCompany, ...result }
+                            : state.currentCompany,
+                        companies: state.companies.map(c => c.id === id ? { ...c, ...result } : c),
+                    }));
                 } catch (error) {
                     set({ error: (error as ApiError).response?.data?.message || 'Failed to update company' });
+                    throw error;
                 } finally {
                     set({ isLoading: false });
                 }

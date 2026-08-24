@@ -92,62 +92,110 @@ export default function Settings() {
 
 // --- Tab Components ---
 
-const GeneralTab = () => (
-    <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <header className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-primary-50 flex items-center justify-center text-primary-500 shadow-sm">
-                <Building2 className="h-6 w-6" />
-            </div>
-            <div>
-                <h2 className="text-xl font-bold text-surface-900 font-serif">Company Information</h2>
-                <p className="text-surface-900/70 text-sm">Your registered business details</p>
-            </div>
-        </header>
+const GeneralTab = () => {
+    const { currentCompany, updateCompany, isLoading } = useCompanyStore();
+    const { toast } = useToast();
 
-        <div className="space-y-6">
-            <section className="space-y-4">
-                <h3 className="text-sm font-bold text-surface-900 border-b border-surface-100 pb-2">Legal Details</h3>
-                <div className="grid grid-cols-1 gap-6">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-surface-900">Legal Business Name <span className="text-danger-500">*</span></label>
-                        <Input defaultValue={useCompanyStore().currentCompany?.legalName || ''} />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-surface-900">Trading Name <span className="text-danger-500">*</span></label>
-                        <Input defaultValue={useCompanyStore().currentCompany?.name || ''} />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-surface-900">RC Number <span className="text-danger-500">*</span></label>
-                        <Input defaultValue={useCompanyStore().currentCompany?.taxId || ''} />
-                    </div>
+    const [form, setForm] = React.useState({
+        legalName: "",
+        name: "",
+        taxId: "",
+        address: "",
+        contactEmail: "",
+        contactPhone: "",
+    });
+
+    React.useEffect(() => {
+        if (!currentCompany) return;
+        setForm({
+            legalName: currentCompany.legalName || "",
+            name: currentCompany.name || "",
+            taxId: currentCompany.taxId || "",
+            address: currentCompany.address || "",
+            contactEmail: currentCompany.contactEmail || "",
+            contactPhone: currentCompany.contactPhone || "",
+        });
+    }, [currentCompany]);
+
+    const updateField = (field: keyof typeof form, value: string) => {
+        setForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleSave = async () => {
+        if (!currentCompany?.id) return;
+        try {
+            await updateCompany(currentCompany.id, form);
+            toast({ title: "Company profile updated", variant: "success" });
+        } catch {
+            toast({ title: "Couldn't save changes", description: "Failed to update company profile.", variant: "error" });
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <header className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-primary-50 flex items-center justify-center text-primary-500 shadow-sm">
+                    <Building2 className="h-6 w-6" />
                 </div>
-            </section>
+                <div>
+                    <h2 className="text-xl font-bold text-surface-900 font-serif">Company Information</h2>
+                    <p className="text-surface-900/70 text-sm">Your registered business details</p>
+                </div>
+            </header>
 
-            <section className="space-y-4 pt-4">
-                <h3 className="text-sm font-bold text-surface-900 border-b border-surface-100 pb-2">Contact Information</h3>
-                <div className="space-y-6">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-surface-900">Registered Address <span className="text-danger-500">*</span></label>
-                        <textarea
-                            className="w-full min-h-[100px] p-4 rounded-xl border border-surface-200 bg-surface-50 text-sm text-surface-900 placeholder:text-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all resize-none"
-                            defaultValue="123 Industrial Estate, Lagos Business District, Lagos, Nigeria"
-                        />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+                <section className="space-y-4">
+                    <h3 className="text-sm font-bold text-surface-900 border-b border-surface-100 pb-2">Legal Details</h3>
+                    <div className="grid grid-cols-1 gap-6">
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-surface-900">Contact Email <span className="text-danger-500">*</span></label>
-                            <Input defaultValue='' />
+                            <label className="text-xs font-bold text-surface-900">Legal Business Name <span className="text-danger-500">*</span></label>
+                            <Input value={form.legalName} onChange={(e) => updateField("legalName", e.target.value)} />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-surface-900">Contact Phone <span className="text-danger-500">*</span></label>
-                            <Input defaultValue='' />
+                            <label className="text-xs font-bold text-surface-900">Trading Name <span className="text-danger-500">*</span></label>
+                            <Input value={form.name} onChange={(e) => updateField("name", e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-surface-900">RC Number <span className="text-danger-500">*</span></label>
+                            <Input value={form.taxId} onChange={(e) => updateField("taxId", e.target.value)} />
                         </div>
                     </div>
+                </section>
+
+                <section className="space-y-4 pt-4">
+                    <h3 className="text-sm font-bold text-surface-900 border-b border-surface-100 pb-2">Contact Information</h3>
+                    <div className="space-y-6">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-surface-900">Registered Address</label>
+                            <textarea
+                                className="w-full min-h-[100px] p-4 rounded-xl border border-surface-200 bg-surface-50 text-sm text-surface-900 placeholder:text-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all resize-none"
+                                placeholder="Full street address, city, state"
+                                value={form.address}
+                                onChange={(e) => updateField("address", e.target.value)}
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-surface-900">Contact Email</label>
+                                <Input value={form.contactEmail} onChange={(e) => updateField("contactEmail", e.target.value)} />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-surface-900">Contact Phone</label>
+                                <Input value={form.contactPhone} onChange={(e) => updateField("contactPhone", e.target.value)} />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div className="flex justify-end pt-4 border-t border-surface-100">
+                    <Button className="font-bold h-11 px-8" onClick={handleSave} disabled={isLoading || !currentCompany?.id}>
+                        {isLoading ? "Saving..." : "Save Changes"}
+                    </Button>
                 </div>
-            </section>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const ApiTab = () => {
     const {
