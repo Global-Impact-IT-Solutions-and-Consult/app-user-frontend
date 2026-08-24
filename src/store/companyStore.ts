@@ -99,6 +99,7 @@ interface CompanyState {
     fetchWebhooks: (companyId: string) => Promise<void>;
     createWebhook: (companyId: string, data: Record<string, unknown>) => Promise<Webhook>;
     updateWebhook: (companyId: string, webhookId: string, data: Record<string, unknown>) => Promise<void>;
+    testWebhook: (companyId: string, webhookId: string, eventType: string, payload?: Record<string, unknown>) => Promise<{ success: boolean; statusCode?: number; message?: string; error?: string }>;
 
     // API Keys
     fetchCompanySettings: (companyId: string) => Promise<void>;
@@ -237,6 +238,21 @@ export const useCompanyStore = create<CompanyState>()(
                     throw error;
                 } finally {
                     set({ isLoading: false });
+                }
+            },
+
+            testWebhook: async (companyId, webhookId, eventType, payload) => {
+                set({ error: null });
+                try {
+                    const response = await api.post(`/companies/${companyId}/webhooks/${webhookId}/test`, {
+                        eventType,
+                        payload,
+                    });
+                    return response.data.data || response.data;
+                } catch (error) {
+                    const message = (error as ApiError).response?.data?.message || 'Failed to test webhook';
+                    set({ error: message });
+                    throw error;
                 }
             },
 

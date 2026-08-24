@@ -158,6 +158,7 @@ const ApiTab = () => {
         webhooks,
         createWebhook,
         updateWebhook,
+        testWebhook,
         regenerateApiKey
     } = useCompanyStore();
 
@@ -245,12 +246,39 @@ const ApiTab = () => {
     };
 
     const handleTestWebhook = async () => {
+        if (!currentCompany?.id || webhooks.length === 0) {
+            toast({ title: "No webhook to test", description: "Save a webhook URL first, then send a test event.", variant: "warning" });
+            return;
+        }
+
+        const hook = webhooks[0];
+        const eventType = hook.subscribedEvents?.[0] || "invoice.created";
         setIsTesting(true);
-        // Mock test for now or call API if exists
-        setTimeout(() => {
-            toast({ title: "Test sent", description: "Test webhook sent successfully!", variant: "success" });
+        try {
+            const result = await testWebhook(currentCompany.id, hook.id, eventType);
+            if (result.success) {
+                toast({
+                    title: "Test sent",
+                    description: `Your endpoint responded with status ${result.statusCode}.`,
+                    variant: "success",
+                });
+            } else {
+                toast({
+                    title: "Endpoint didn't respond correctly",
+                    description: result.error || "The test event was sent but delivery failed.",
+                    variant: "error",
+                });
+            }
+        } catch (err) {
+            const message = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
+            toast({
+                title: "Couldn't send test webhook",
+                description: message || "Failed to trigger the webhook test.",
+                variant: "error",
+            });
+        } finally {
             setIsTesting(false);
-        }, 1000);
+        }
     };
 
     if (!currentCompany) return <div className="p-8 text-center">Please select a company first.</div>;
