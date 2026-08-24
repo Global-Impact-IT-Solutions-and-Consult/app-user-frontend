@@ -12,6 +12,7 @@ import Logs from "./pages/Logs";
 import Settings from "./pages/Settings";
 import Integrations from "./pages/Integrations";
 import IntegrationDetail from "./pages/IntegrationDetail";
+import ProviderInvoiceDetail from "./pages/ProviderInvoiceDetail";
 import { DashboardLayout } from "./components/DashboardLayout";
 import RequireAuth from "./components/RequireAuth";
 import RequireGuest from "./components/RequireGuest";
@@ -36,6 +37,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardLayout><Outlet /></DashboardLayout>}>
             <Route index element={<Dashboard />} />
             <Route path="invoices" element={<Invoices />} />
+            <Route path="invoices/provider/:service/:invoiceId" element={<ProviderInvoiceDetail />} />
             <Route path="invoices/:id" element={<InvoiceDetails />} />
             <Route path="logs" element={<Logs />} />
             <Route path="settings" element={<Settings />} />

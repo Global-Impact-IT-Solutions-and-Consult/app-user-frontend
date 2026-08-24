@@ -48,6 +48,10 @@ interface ZohoBooksState {
     jobs: ZohoJob[];
     jobsTotal: number;
 
+    currentInvoice: Record<string, unknown> | null;
+    isLoadingInvoice: boolean;
+    invoiceError: string | null;
+
     isLoading: boolean;
     isSyncing: boolean;
     error: string | null;
@@ -58,6 +62,7 @@ interface ZohoBooksState {
     updatePolling: (companyId: string, pollingEnabled: boolean) => Promise<void>;
     sync: (companyId: string) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
+    fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
 }
 
 export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
@@ -73,6 +78,10 @@ export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
 
     jobs: [],
     jobsTotal: 0,
+
+    currentInvoice: null,
+    isLoadingInvoice: false,
+    invoiceError: null,
 
     isLoading: false,
     isSyncing: false,
@@ -180,6 +189,22 @@ export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
             set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch Zoho Books jobs' });
         } finally {
             set({ isLoading: false });
+        }
+    },
+
+    fetchInvoice: async (companyId, invoiceId) => {
+        set({ isLoadingInvoice: true, invoiceError: null });
+        try {
+            const response = await api.get(`/zoho-books/${companyId}/invoices/${invoiceId}`);
+            const result = response.data.data || response.data;
+            set({ currentInvoice: result || null });
+        } catch (error) {
+            set({
+                currentInvoice: null,
+                invoiceError: (error as ApiError).response?.data?.message || 'Failed to fetch Zoho Books invoice',
+            });
+        } finally {
+            set({ isLoadingInvoice: false });
         }
     },
 }));

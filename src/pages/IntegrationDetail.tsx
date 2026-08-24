@@ -107,6 +107,7 @@ function ZohoBooksPanel({
     setSearchParams: (params: URLSearchParams, opts?: { replace?: boolean }) => void;
     toast: ReturnType<typeof useToast>["toast"];
 }) {
+    const navigate = useNavigate();
     const { currentCompany } = useCompanyStore();
     const {
         connected,
@@ -330,7 +331,8 @@ function ZohoBooksPanel({
                                 return (
                                     <div
                                         key={job.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm"
+                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm cursor-pointer hover:border-primary-100 transition-colors"
+                                        onClick={() => navigate(`/dashboard/invoices/provider/zoho-books/${job.zohoInvoiceId}`)}
                                     >
                                         <span className="font-medium text-surface-900">
                                             {job.zohoInvoiceNumber || job.zohoInvoiceId}
@@ -369,6 +371,7 @@ function QuickBooksPanel({
     setSearchParams: (params: URLSearchParams, opts?: { replace?: boolean }) => void;
     toast: ReturnType<typeof useToast>["toast"];
 }) {
+    const navigate = useNavigate();
     const { currentCompany } = useCompanyStore();
     const {
         connected,
@@ -628,7 +631,8 @@ function QuickBooksPanel({
                                 return (
                                     <div
                                         key={job.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm"
+                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm cursor-pointer hover:border-primary-100 transition-colors"
+                                        onClick={() => navigate(`/dashboard/invoices/provider/quickbooks/${job.quickbooksInvoiceId}`)}
                                     >
                                         <span className="font-medium text-surface-900">
                                             {job.quickbooksInvoiceNumber || job.quickbooksInvoiceId}
@@ -667,6 +671,7 @@ function XeroPanel({
     setSearchParams: (params: URLSearchParams, opts?: { replace?: boolean }) => void;
     toast: ReturnType<typeof useToast>["toast"];
 }) {
+    const navigate = useNavigate();
     const { currentCompany } = useCompanyStore();
     const {
         connected,
@@ -988,7 +993,8 @@ function XeroPanel({
                                 return (
                                     <div
                                         key={job.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm"
+                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm cursor-pointer hover:border-primary-100 transition-colors"
+                                        onClick={() => navigate(`/dashboard/invoices/provider/xero/${job.xeroInvoiceId}`)}
                                     >
                                         <span className="font-medium text-surface-900">
                                             {job.xeroInvoiceNumber || job.xeroInvoiceId}

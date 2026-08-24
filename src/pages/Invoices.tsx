@@ -19,6 +19,7 @@ import { useReceiptStore } from "../store/receiptStore";
 import { useZohoBooksStore, type ZohoJob } from "../store/zohoBooksStore";
 import { useQuickBooksStore, type QuickBooksJob } from "../store/quickBooksStore";
 import { useXeroStore, type XeroJob } from "../store/xeroStore";
+import { getString, getNumber, sourceName } from "../lib/providerInvoice";
 
 const tabs = [
     { label: "All Invoices", id: "all" },
@@ -64,31 +65,6 @@ type ReceiptLike = {
     counterpartyName?: string;
 };
 
-function getString(payload: Record<string, unknown> | null | undefined, keys: string[]) {
-    for (const key of keys) {
-        const value = payload?.[key];
-        if (typeof value === "string" && value.trim()) return value;
-        if (typeof value === "number") return String(value);
-        if (value && typeof value === "object") {
-            const nested = value as Record<string, unknown>;
-            for (const nestedKey of ["name", "Name", "value", "Value"]) {
-                const nestedValue = nested[nestedKey];
-                if (typeof nestedValue === "string" && nestedValue.trim()) return nestedValue;
-            }
-        }
-    }
-    return "";
-}
-
-function getNumber(payload: Record<string, unknown> | null | undefined, keys: string[]) {
-    for (const key of keys) {
-        const value = payload?.[key];
-        if (typeof value === "number") return value;
-        if (typeof value === "string" && value.trim() && !Number.isNaN(Number(value))) return Number(value);
-    }
-    return null;
-}
-
 function normalizeStatus(status: string) {
     return status.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -100,13 +76,6 @@ function statusVariant(status: string): "primary" | "success" | "warning" | "dan
     if (["processing", "writeback_pending", "imported"].includes(value)) return "warning";
     if (value === "submitted") return "primary";
     return "gray";
-}
-
-function sourceName(source: InvoiceRow["source"]) {
-    if (source === "zoho-books") return "Zoho Books";
-    if (source === "quickbooks") return "QuickBooks";
-    if (source === "xero") return "Xero";
-    return "Receipt Service";
 }
 
 function normalizeReceipt(receipt: ReceiptLike): InvoiceRow {
@@ -126,8 +95,19 @@ function normalizeReceipt(receipt: ReceiptLike): InvoiceRow {
     };
 }
 
+// sourceName() only knows about the three provider sources; receipts get their own label here.
+function displaySourceName(source: InvoiceRow["source"]) {
+    return source === "receipt" ? "Receipt Service" : sourceName(source);
+}
+
 function normalizeProviderJob(job: ZohoJob | QuickBooksJob | XeroJob, source: "zoho-books" | "quickbooks" | "xero"): InvoiceRow {
     const payload = job.sourcePayload || null;
+    const providerInvoiceId =
+        source === "zoho-books"
+            ? (job as ZohoJob).zohoInvoiceId
+            : source === "quickbooks"
+                ? (job as QuickBooksJob).quickbooksInvoiceId
+                : (job as XeroJob).xeroInvoiceId;
     const invoiceId =
         source === "zoho-books"
             ? (job as ZohoJob).zohoInvoiceNumber || (job as ZohoJob).zohoInvoiceId
@@ -147,7 +127,11 @@ function normalizeProviderJob(job: ZohoJob | QuickBooksJob | XeroJob, source: "z
         currency: getString(payload, ["currency_code", "CurrencyRef", "CurrencyCode"]) || "",
         status: job.status,
         updatedAt: job.updatedAt,
-        route: job.receiptId ? `/dashboard/invoices/${job.receiptId}` : undefined,
+        route: job.receiptId
+            ? `/dashboard/invoices/${job.receiptId}`
+            : providerInvoiceId
+                ? `/dashboard/invoices/provider/${source}/${providerInvoiceId}`
+                : undefined,
     };
 }
 
@@ -253,7 +237,7 @@ export default function Invoices() {
             if (statusFilter !== "All Statuses" && normalizeStatus(row.status) !== statusFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                if (!`${row.invoiceId} ${row.counterpartyName} ${sourceName(row.source)}`.toLowerCase().includes(q)) return false;
+                if (!`${row.invoiceId} ${row.counterpartyName} ${displaySourceName(row.source)}`.toLowerCase().includes(q)) return false;
             }
 
             return true;
@@ -397,7 +381,7 @@ export default function Invoices() {
                                                 className="font-medium"
                                                 icon={activity.type === "sent" ? <Send className="h-3 w-3" /> : <Download className="h-3 w-3" />}
                                             >
-                                                {sourceName(activity.source)}
+                                                {displaySourceName(activity.source)}
                                             </Badge>
                                         </div>
                                     </td>

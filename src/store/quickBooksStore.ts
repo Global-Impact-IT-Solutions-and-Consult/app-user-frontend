@@ -48,6 +48,10 @@ interface QuickBooksState {
     jobs: QuickBooksJob[];
     jobsTotal: number;
 
+    currentInvoice: Record<string, unknown> | null;
+    isLoadingInvoice: boolean;
+    invoiceError: string | null;
+
     isLoading: boolean;
     isSyncing: boolean;
     error: string | null;
@@ -58,6 +62,7 @@ interface QuickBooksState {
     updatePolling: (companyId: string, pollingEnabled: boolean) => Promise<void>;
     sync: (companyId: string) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
+    fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
 }
 
 export const useQuickBooksStore = create<QuickBooksState>()((set) => ({
@@ -74,6 +79,10 @@ export const useQuickBooksStore = create<QuickBooksState>()((set) => ({
 
     jobs: [],
     jobsTotal: 0,
+
+    currentInvoice: null,
+    isLoadingInvoice: false,
+    invoiceError: null,
 
     isLoading: false,
     isSyncing: false,
@@ -180,6 +189,22 @@ export const useQuickBooksStore = create<QuickBooksState>()((set) => ({
             set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch QuickBooks jobs' });
         } finally {
             set({ isLoading: false });
+        }
+    },
+
+    fetchInvoice: async (companyId, invoiceId) => {
+        set({ isLoadingInvoice: true, invoiceError: null });
+        try {
+            const response = await api.get(`/quickbooks/${companyId}/invoices/${invoiceId}`);
+            const result = response.data.data || response.data;
+            set({ currentInvoice: result || null });
+        } catch (error) {
+            set({
+                currentInvoice: null,
+                invoiceError: (error as ApiError).response?.data?.message || 'Failed to fetch QuickBooks invoice',
+            });
+        } finally {
+            set({ isLoadingInvoice: false });
         }
     },
 }));

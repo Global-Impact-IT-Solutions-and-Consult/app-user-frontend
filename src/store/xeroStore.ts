@@ -59,6 +59,10 @@ interface XeroState {
     jobs: XeroJob[];
     jobsTotal: number;
 
+    currentInvoice: Record<string, unknown> | null;
+    isLoadingInvoice: boolean;
+    invoiceError: string | null;
+
     isLoading: boolean;
     isSyncing: boolean;
     isLoadingTenants: boolean;
@@ -72,6 +76,7 @@ interface XeroState {
     fetchTenants: (companyId: string) => Promise<void>;
     setTenant: (companyId: string, tenant: XeroTenant) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
+    fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
 }
 
 const getErrorMessage = (error: unknown, fallback: string) =>
@@ -93,6 +98,10 @@ export const useXeroStore = create<XeroState>()((set) => ({
     tenants: [],
     jobs: [],
     jobsTotal: 0,
+
+    currentInvoice: null,
+    isLoadingInvoice: false,
+    invoiceError: null,
 
     isLoading: false,
     isSyncing: false,
@@ -239,6 +248,22 @@ export const useXeroStore = create<XeroState>()((set) => ({
             set({ error: getErrorMessage(error, 'Failed to fetch Xero jobs') });
         } finally {
             set({ isLoading: false });
+        }
+    },
+
+    fetchInvoice: async (companyId, invoiceId) => {
+        set({ isLoadingInvoice: true, invoiceError: null });
+        try {
+            const response = await api.get(`/xero/${companyId}/invoices/${invoiceId}`);
+            const result = response.data.data || response.data;
+            set({ currentInvoice: result || null });
+        } catch (error) {
+            set({
+                currentInvoice: null,
+                invoiceError: getErrorMessage(error, 'Failed to fetch Xero invoice'),
+            });
+        } finally {
+            set({ isLoadingInvoice: false });
         }
     },
 }));
