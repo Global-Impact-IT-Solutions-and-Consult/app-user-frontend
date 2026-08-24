@@ -103,6 +103,7 @@ interface CompanyState {
 
     // API Keys
     fetchCompanySettings: (companyId: string) => Promise<void>;
+    updateMfaRequirement: (companyId: string, mfaRequired: boolean) => Promise<void>;
     fetchApiKeys: (companyId: string) => Promise<void>;
     revokeApiKey: (companyId: string, keyId: string) => Promise<void>;
     regenerateApiKey: (companyId: string, type: 'live' | 'test') => Promise<void>;
@@ -265,6 +266,24 @@ export const useCompanyStore = create<CompanyState>()(
                     set({ companySettings: result });
                 } catch (error) {
                     console.error("Failed to fetch company settings", error);
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
+
+            updateMfaRequirement: async (companyId, mfaRequired) => {
+                set({ isLoading: true, error: null });
+                try {
+                    const response = await api.put(`/company-settings/company/${companyId}/mfa`, { mfaRequired });
+                    const result = response.data.data || response.data;
+                    set(state => ({
+                        companySettings: state.companySettings
+                            ? { ...state.companySettings, mfaRequired: result?.mfaRequired ?? mfaRequired }
+                            : state.companySettings,
+                    }));
+                } catch (error) {
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to update MFA requirement' });
+                    throw error;
                 } finally {
                     set({ isLoading: false });
                 }

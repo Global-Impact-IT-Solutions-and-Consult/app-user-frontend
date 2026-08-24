@@ -477,11 +477,39 @@ const ApiTab = () => {
 
 const SecurityTab = () => {
     const { user } = useAuthStore();
+    const { currentCompany, companySettings, fetchCompanySettings, updateMfaRequirement } = useCompanyStore();
     const [isMfaSetupOpen, setIsMfaSetupOpen] = React.useState(false);
     const [isDisableOpen, setIsDisableOpen] = React.useState(false);
+    const [isUpdatingPolicy, setIsUpdatingPolicy] = React.useState(false);
+    const { toast } = useToast();
+
+    React.useEffect(() => {
+        if (currentCompany?.id && !companySettings) {
+            fetchCompanySettings(currentCompany.id);
+        }
+    }, [currentCompany?.id, companySettings, fetchCompanySettings]);
 
     const handleDisableMfa = async () => {
         setIsDisableOpen(true);
+    };
+
+    const handleEnforceMfaToggle = async (enforced: boolean) => {
+        if (!currentCompany?.id) return;
+        setIsUpdatingPolicy(true);
+        try {
+            await updateMfaRequirement(currentCompany.id, enforced);
+            toast({
+                title: enforced ? "MFA now required for all users" : "MFA requirement lifted",
+                description: enforced
+                    ? "Every user in this company must enable two-factor authentication."
+                    : "Users can choose whether to enable two-factor authentication.",
+                variant: "success",
+            });
+        } catch {
+            toast({ title: "Couldn't update MFA policy", variant: "error" });
+        } finally {
+            setIsUpdatingPolicy(false);
+        }
     };
 
     return (
@@ -523,15 +551,19 @@ const SecurityTab = () => {
                     </div>
                 </div>
 
-                {/* Company Policy (Visual Only) */}
+                {/* Company Policy */}
                 <div className="space-y-4 pt-4">
                     <h3 className="text-sm font-bold text-surface-900 border-b border-surface-100 pb-2">Company Policy</h3>
-                    <div className="flex items-center justify-between p-4 rounded-xl border border-surface-100 bg-white opacity-70">
+                    <div className="flex items-center justify-between p-4 rounded-xl border border-surface-100 bg-white">
                         <div>
                             <p className="text-sm font-bold text-surface-900">Enforce MFA for all users</p>
                             <p className="text-xs text-surface-900/70">NITDA Mandate Requirement</p>
                         </div>
-                        <Toggle defaultChecked={true} disabled />
+                        <Toggle
+                            checked={companySettings?.mfaRequired ?? false}
+                            onToggleChange={handleEnforceMfaToggle}
+                            disabled={!currentCompany?.id || isUpdatingPolicy}
+                        />
                     </div>
                 </div>
 
