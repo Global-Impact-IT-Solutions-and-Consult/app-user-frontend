@@ -11,15 +11,16 @@ import {
     CheckCircle2,
     AlertTriangle,
     RefreshCw,
-    Plus,
     SlidersHorizontal
 } from "lucide-react";
 import { useReceiptStore } from "../store/receiptStore";
 import { useLogStore } from "../store/logStore";
+import { useToast } from "../components/ui/Toast";
 
 export default function Dashboard() {
     const [isTimelineSettingsOpen, setIsTimelineSettingsOpen] = React.useState(false);
     const [selectedPeriod, setSelectedPeriod] = React.useState("7days");
+    const { toast } = useToast();
 
     // Store Integration
     const { totalReceipts, fetchReceipts, receipts } = useReceiptStore();
@@ -37,6 +38,14 @@ export default function Dashboard() {
     const handleRefresh = () => {
         fetchReceipts({ limit: 1, page: 1 });
         fetchLogs({ limit: 100, page: 1 });
+    };
+
+    const handleSyncInvoice = () => {
+        toast({
+            title: "Not connected yet",
+            description: "Waiting on a sync endpoint from the backend team.",
+            variant: "warning",
+        });
     };
 
     return (
@@ -61,9 +70,9 @@ export default function Dashboard() {
                             <RefreshCw className="h-4 w-4 text-primary-500" />
                             Refresh
                         </Button>
-                        <Button className="gap-2 h-11 px-6 font-bold">
-                            <Plus className="h-4 w-4" />
-                            New Invoice
+                        <Button className="gap-2 h-11 px-6 font-bold" onClick={handleSyncInvoice}>
+                            <RefreshCw className="h-4 w-4" />
+                            Sync Invoice
                         </Button>
                     </div>
                 </header>
