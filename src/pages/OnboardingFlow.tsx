@@ -36,7 +36,7 @@ export default function OnboardingFlow() {
         legalName: "",
         businessType: "",
         taxId: "",
-        address: "",
+        registeredAddress: "",
         contactPhone: "",
         contactPerson: "",
         contactEmail: "",
@@ -58,7 +58,7 @@ export default function OnboardingFlow() {
                 taxId: companyData.taxId,
                 businessType: companyData.businessType || undefined,
                 industry: companyData.industry || undefined,
-                address: companyData.address || undefined,
+                registeredAddress: companyData.registeredAddress || undefined,
                 contactPerson: companyData.contactPerson || undefined,
                 contactEmail: companyData.contactEmail || undefined,
                 contactPhone: companyData.contactPhone || undefined,
@@ -175,7 +175,7 @@ function CompanyInfoStep({ data, updateData }: {
         name: string;
         businessType: string;
         taxId: string;
-        address: string;
+        registeredAddress: string;
         contactPhone: string;
         contactPerson: string;
         contactEmail: string;
@@ -247,8 +247,8 @@ function CompanyInfoStep({ data, updateData }: {
                             <textarea
                                 className="flex min-h-[100px] w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                                 placeholder="Full street address, city, state"
-                                value={data.address}
-                                onChange={(e) => updateData("address", e.target.value)}
+                                value={data.registeredAddress}
+                                onChange={(e) => updateData("registeredAddress", e.target.value)}
                             />
                         </div>
                         <Input

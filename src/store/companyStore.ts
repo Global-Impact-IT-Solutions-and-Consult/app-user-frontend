@@ -46,7 +46,7 @@ interface Company {
     taxId?: string;
     businessType?: string;
     industry?: string;
-    address?: string;
+    registeredAddress?: string;
     contactPerson?: string;
     contactEmail?: string;
     contactPhone?: string;

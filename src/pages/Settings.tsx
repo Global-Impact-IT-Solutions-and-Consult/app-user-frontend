@@ -100,7 +100,7 @@ const GeneralTab = () => {
         legalName: "",
         name: "",
         taxId: "",
-        address: "",
+        registeredAddress: "",
         contactEmail: "",
         contactPhone: "",
     });
@@ -111,7 +111,7 @@ const GeneralTab = () => {
             legalName: currentCompany.legalName || "",
             name: currentCompany.name || "",
             taxId: currentCompany.taxId || "",
-            address: currentCompany.address || "",
+            registeredAddress: currentCompany.registeredAddress || "",
             contactEmail: currentCompany.contactEmail || "",
             contactPhone: currentCompany.contactPhone || "",
         });
@@ -170,8 +170,8 @@ const GeneralTab = () => {
                             <textarea
                                 className="w-full min-h-[100px] p-4 rounded-xl border border-surface-200 bg-surface-50 text-sm text-surface-900 placeholder:text-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all resize-none"
                                 placeholder="Full street address, city, state"
-                                value={form.address}
-                                onChange={(e) => updateField("address", e.target.value)}
+                                value={form.registeredAddress}
+                                onChange={(e) => updateField("registeredAddress", e.target.value)}
                             />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
