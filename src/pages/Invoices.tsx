@@ -5,7 +5,6 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import {
-    RefreshCw,
     Upload,
     Search,
     Send,
@@ -20,7 +19,6 @@ import { useZohoBooksStore, type ZohoJob } from "../store/zohoBooksStore";
 import { useQuickBooksStore, type QuickBooksJob } from "../store/quickBooksStore";
 import { useXeroStore, type XeroJob } from "../store/xeroStore";
 import { getString, getNumber, sourceName } from "../lib/providerInvoice";
-import { useToast } from "../components/ui/Toast";
 
 const tabs = [
     { label: "All Invoices", id: "all" },
@@ -154,7 +152,6 @@ function getDateFromRange(dateRange: string) {
 
 export default function Invoices() {
     const navigate = useNavigate();
-    const { toast } = useToast();
     const { currentCompany } = useCompanyStore();
     const {
         receipts,
@@ -204,14 +201,6 @@ export default function Invoices() {
         fetchQuickBooksJobs(currentCompany.id, 1, 100);
         fetchXeroJobs(currentCompany.id, 1, 100);
     }, [currentCompany?.id, fetchQuickBooksJobs, fetchXeroJobs, fetchZohoJobs]);
-
-    const handleSyncInvoice = () => {
-        toast({
-            title: "Not connected yet",
-            description: "Waiting on a sync endpoint from the backend team.",
-            variant: "warning",
-        });
-    };
 
     const handleClearFilters = () => {
         setSearchQuery("");
@@ -274,10 +263,6 @@ export default function Invoices() {
                     <Button variant="outline" className="gap-2 h-11 px-6 font-bold border-surface-200">
                         <Upload className="h-4 w-4 text-primary-500" />
                         Export
-                    </Button>
-                    <Button className="gap-2 h-11 px-6 font-bold" onClick={handleSyncInvoice}>
-                        <RefreshCw className="h-4 w-4" />
-                        Sync Invoice
                     </Button>
                 </div>
             </header>
