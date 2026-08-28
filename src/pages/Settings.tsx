@@ -18,7 +18,8 @@ import {
     Info,
     Clock,
     X,
-    Key
+    Key,
+    Ban
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useCompanyStore } from "../store/companyStore";
@@ -212,6 +213,7 @@ const ApiTab = () => {
         updateWebhook,
         testWebhook,
         regenerateApiKey,
+        revokeApiKey,
         updateOnboardingStep
     } = useCompanyStore();
 
@@ -249,6 +251,7 @@ const ApiTab = () => {
     };
 
     const [regenerateKeyId, setRegenerateKeyId] = React.useState<string | null>(null);
+    const [revokeKeyId, setRevokeKeyId] = React.useState<string | null>(null);
 
     // API setup only counts as done once both a key and a webhook exist -
     // called after either succeeds here, using the latest known state of both.
@@ -282,6 +285,19 @@ const ApiTab = () => {
             }
         }
         setRegenerateKeyId(null);
+    };
+
+    const handleConfirmRevoke = async () => {
+        if (revokeKeyId && currentCompany?.id) {
+            try {
+                await revokeApiKey(currentCompany.id, revokeKeyId);
+                toast({ title: "Key Revoked", description: "This API key no longer works. Regenerate a new one when you're ready.", variant: "success" });
+                await fetchCompanySettings(currentCompany.id);
+            } catch {
+                toast({ title: "Couldn't revoke key", variant: "error" });
+            }
+        }
+        setRevokeKeyId(null);
     };
 
     // Webhook Handlers
@@ -431,6 +447,15 @@ const ApiTab = () => {
                                     <Copy className="h-4 w-4" />
                                     Copy
                                 </Button>
+                                <Button
+                                    variant="danger"
+                                    className="gap-2 h-10 px-6 font-bold bg-danger-50 text-danger-500 border-none hover:bg-danger-100"
+                                    onClick={() => activeSetting?.id && setRevokeKeyId(activeSetting.id)}
+                                    disabled={!activeSetting?.id || !activeSetting?.isActive}
+                                >
+                                    <Ban className="h-4 w-4" />
+                                    Revoke
+                                </Button>
                             </div>
                         </div>
                     </section>
@@ -542,6 +567,15 @@ const ApiTab = () => {
                 title="Regenerate API Key"
                 description="Are you sure? The old key will stop working immediately. Access relying on it will be interrupted."
                 confirmText="Regenerate Key"
+            />
+            <ConfirmModal
+                isOpen={!!revokeKeyId}
+                onClose={() => setRevokeKeyId(null)}
+                onConfirm={handleConfirmRevoke}
+                title="Revoke API Key"
+                description="This key will stop working immediately, with no replacement issued. Anything using it will break until you generate a new one."
+                confirmText="Revoke Key"
+                variant="danger"
             />
         </div>
     );
