@@ -425,7 +425,9 @@ const ApiTab = () => {
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-surface-900">Primary API Key</label>
                                 <div className="w-full px-4 py-3 bg-slate-900 text-slate-300 font-mono text-sm rounded-lg border border-slate-800 break-all min-h-[46px] flex items-center">
-                                    {activeSetting?.publicKey || ''}
+                                    {activeSetting?.isActive && activeSetting?.publicKey
+                                        ? activeSetting.publicKey
+                                        : <span className="text-slate-500 italic">No active key — generate one to get started</span>}
                                 </div>
                             </div>
                             <div className="flex gap-4">
@@ -442,7 +444,7 @@ const ApiTab = () => {
                                     variant="outline"
                                     className="gap-2 h-10 px-6 font-bold border-surface-200 text-primary-600"
                                     onClick={() => handleCopy(activeSetting?.publicKey || '')}
-                                    disabled={!activeSetting?.publicKey}
+                                    disabled={!activeSetting?.isActive || !activeSetting?.publicKey}
                                 >
                                     <Copy className="h-4 w-4" />
                                     Copy
