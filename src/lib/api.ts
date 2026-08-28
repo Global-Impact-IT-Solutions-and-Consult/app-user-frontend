@@ -1,8 +1,12 @@
 import axios from 'axios';
 
+// Shared with anything that needs to navigate the browser straight to the
+// backend (e.g. OAuth entry points), not just make an axios call.
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4002/api';
+
 // Create an axios instance
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4002/api',
+    baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },

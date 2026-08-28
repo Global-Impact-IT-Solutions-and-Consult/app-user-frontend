@@ -13,6 +13,8 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 import { Lock, Eye, EyeOff } from "lucide-react";
+import { GoogleIcon } from "../components/icons/GoogleIcon";
+import { API_BASE_URL } from "../lib/api";
 
 export default function Login() {
     const navigate = useNavigate()
@@ -27,6 +29,10 @@ export default function Login() {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    const handleGoogleLogin = () => {
+        window.location.href = `${API_BASE_URL}/auth/google`;
     };
 
     const handleLogin = async () => {
@@ -119,6 +125,24 @@ export default function Login() {
 
                         <Button className="w-full py-6 text-base" onClick={handleLogin} disabled={isLoading}>
                             {isLoading ? "Logging in..." : "Login"}
+                        </Button>
+
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-surface-100"></div>
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-white px-4 text-surface-900/50 font-medium">Or</span>
+                            </div>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            className="w-full py-6 text-base gap-3 border-surface-200"
+                            onClick={handleGoogleLogin}
+                        >
+                            <GoogleIcon className="h-4 w-4" />
+                            Continue with Google
                         </Button>
 
                         <div className="relative py-4">

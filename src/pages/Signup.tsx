@@ -5,6 +5,8 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card"; // Added Card import
 import { ShieldCheck, LifeBuoy, FileText, Eye, EyeOff } from "lucide-react";
+import { GoogleIcon } from "../components/icons/GoogleIcon";
+import { API_BASE_URL } from "../lib/api";
 
 export default function Signup() {
     const navigate = useNavigate();
@@ -21,6 +23,10 @@ export default function Signup() {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    const handleGoogleSignup = () => {
+        window.location.href = `${API_BASE_URL}/auth/google`;
     };
 
     const handleSignup = async (e: React.FormEvent) => {
@@ -121,6 +127,25 @@ export default function Signup() {
                                 {isLoading ? "Creating Account..." : "Create Account"}
                             </Button>
                         </form>
+
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t border-surface-200" />
+                            </div>
+                            <div className="relative flex justify-center text-xs">
+                                <span className="bg-white px-4 text-surface-900/50 font-medium">Or</span>
+                            </div>
+                        </div>
+
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full text-base h-12 gap-3 border-surface-200"
+                            onClick={handleGoogleSignup}
+                        >
+                            <GoogleIcon className="h-4 w-4" />
+                            Continue with Google
+                        </Button>
 
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
