@@ -85,6 +85,7 @@ interface XeroState {
     fetchTenants: (companyId: string) => Promise<void>;
     setTenant: (companyId: string, tenant: XeroTenant) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
+    fetchJob: (companyId: string, jobId: string) => Promise<void>;
     fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
     fetchAllInvoices: (companyId: string, page?: number, append?: boolean) => Promise<void>;
     importInvoice: (companyId: string, invoiceId: string) => Promise<void>;
@@ -264,6 +265,19 @@ export const useXeroStore = create<XeroState>()((set) => ({
             set({ error: getErrorMessage(error, 'Failed to fetch Xero jobs') });
         } finally {
             set({ isLoading: false });
+        }
+    },
+
+    fetchJob: async (companyId, jobId) => {
+        try {
+            const response = await api.get(`/xero/${companyId}/jobs/${jobId}`);
+            const result = response.data.data || response.data;
+            if (!result) return;
+            set(state => ({
+                jobs: state.jobs.map(job => job.id === jobId ? { ...job, ...result } : job),
+            }));
+        } catch (error) {
+            console.error("Failed to refresh Xero job", error);
         }
     },
 

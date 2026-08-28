@@ -69,6 +69,7 @@ interface ZohoBooksState {
     updatePolling: (companyId: string, pollingEnabled: boolean) => Promise<void>;
     sync: (companyId: string) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
+    fetchJob: (companyId: string, jobId: string) => Promise<void>;
     fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
     fetchAllInvoices: (companyId: string, page?: number, append?: boolean) => Promise<void>;
     importInvoice: (companyId: string, invoiceId: string) => Promise<void>;
@@ -203,6 +204,23 @@ export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
             set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch Zoho Books jobs' });
         } finally {
             set({ isLoading: false });
+        }
+    },
+
+    // Refreshes a single job in place (this endpoint also nudges the backend
+    // to re-check the receipt service's processing status) - used for both
+    // manual refresh and background polling on a single row, without
+    // refetching the whole jobs list.
+    fetchJob: async (companyId, jobId) => {
+        try {
+            const response = await api.get(`/zoho-books/${companyId}/jobs/${jobId}`);
+            const result = response.data.data || response.data;
+            if (!result) return;
+            set(state => ({
+                jobs: state.jobs.map(job => job.id === jobId ? { ...job, ...result } : job),
+            }));
+        } catch (error) {
+            console.error("Failed to refresh Zoho Books job", error);
         }
     },
 

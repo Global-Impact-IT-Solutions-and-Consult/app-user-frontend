@@ -70,6 +70,7 @@ interface QuickBooksState {
     updatePolling: (companyId: string, pollingEnabled: boolean) => Promise<void>;
     sync: (companyId: string) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
+    fetchJob: (companyId: string, jobId: string) => Promise<void>;
     fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
     fetchAllInvoices: (companyId: string, page?: number, append?: boolean) => Promise<void>;
     importInvoice: (companyId: string, invoiceId: string) => Promise<void>;
@@ -204,6 +205,19 @@ export const useQuickBooksStore = create<QuickBooksState>()((set) => ({
             set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch QuickBooks jobs' });
         } finally {
             set({ isLoading: false });
+        }
+    },
+
+    fetchJob: async (companyId, jobId) => {
+        try {
+            const response = await api.get(`/quickbooks/${companyId}/jobs/${jobId}`);
+            const result = response.data.data || response.data;
+            if (!result) return;
+            set(state => ({
+                jobs: state.jobs.map(job => job.id === jobId ? { ...job, ...result } : job),
+            }));
+        } catch (error) {
+            console.error("Failed to refresh QuickBooks job", error);
         }
     },
 

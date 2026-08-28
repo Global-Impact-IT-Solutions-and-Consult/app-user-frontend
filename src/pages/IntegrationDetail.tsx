@@ -7,12 +7,13 @@ import { useToast } from "../components/ui/Toast";
 import { Select } from "../components/ui/Select";
 import { Toggle } from "../components/ui/Toggle";
 import { useCompanyStore } from "../store/companyStore";
-import { useZohoBooksStore, type ZohoJobStatus } from "../store/zohoBooksStore";
-import { useQuickBooksStore, type QuickBooksJobStatus } from "../store/quickBooksStore";
-import { useXeroStore, type XeroJobStatus } from "../store/xeroStore";
+import { useZohoBooksStore, type ZohoJob, type ZohoJobStatus } from "../store/zohoBooksStore";
+import { useQuickBooksStore, type QuickBooksJob, type QuickBooksJobStatus } from "../store/quickBooksStore";
+import { useXeroStore, type XeroJob, type XeroJobStatus } from "../store/xeroStore";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { INTEGRATION_SERVICES } from "../lib/integrations";
 import { getString, getProviderInvoiceId, type ProviderSource } from "../lib/providerInvoice";
+import { cn } from "../lib/utils";
 
 const JOB_STATUS_BADGE: Record<ZohoJobStatus | QuickBooksJobStatus | XeroJobStatus, { label: string; variant: "gray" | "success" | "warning" | "danger" | "primary" }> = {
     imported: { label: "Imported", variant: "gray" },
@@ -164,6 +165,75 @@ function AllInvoicesSection({
     );
 }
 
+const FINAL_JOB_STATUSES = new Set(["completed", "failed"]);
+
+// One row in "Recent Invoice Jobs", shared across all three panels. Polls
+// its own status in place while non-final (the endpoint also nudges the
+// backend to re-check the receipt service), plus a manual refresh button -
+// neither refetches the whole jobs list.
+function JobRow({
+    source,
+    companyId,
+    job,
+    invoiceId,
+    invoiceNumber,
+    navigate,
+    fetchJob,
+}: {
+    source: ProviderSource;
+    companyId: string;
+    job: ZohoJob | QuickBooksJob | XeroJob;
+    invoiceId: string;
+    invoiceNumber: string;
+    navigate: ReturnType<typeof useNavigate>;
+    fetchJob: (companyId: string, jobId: string) => Promise<void>;
+}) {
+    const [isRefreshing, setIsRefreshing] = React.useState(false);
+    const isFinal = FINAL_JOB_STATUSES.has(job.status);
+    const statusInfo = JOB_STATUS_BADGE[job.status] || { label: job.status, variant: "gray" as const };
+
+    React.useEffect(() => {
+        if (isFinal) return;
+        const interval = setInterval(() => {
+            fetchJob(companyId, job.id);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [isFinal, companyId, job.id, fetchJob]);
+
+    const handleRefresh = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsRefreshing(true);
+        try {
+            await fetchJob(companyId, job.id);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
+    return (
+        <div
+            className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm cursor-pointer hover:border-primary-100 transition-colors"
+            onClick={() => navigate(`/dashboard/invoices/provider/${source}/${invoiceId}`)}
+        >
+            <span className="font-medium text-surface-900">{invoiceNumber}</span>
+            <div className="flex items-center gap-3">
+                <span className="text-xs text-surface-900/50">{formatDate(job.updatedAt)}</span>
+                <Badge variant={statusInfo.variant} size="sm">{statusInfo.label}</Badge>
+                {!isFinal && (
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="p-1 hover:bg-surface-100 rounded text-surface-900/50 hover:text-surface-900 transition-colors"
+                        aria-label="Refresh status"
+                    >
+                        <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function IntegrationDetail() {
     const { service } = useParams<{ service: string }>();
     const navigate = useNavigate();
@@ -268,6 +338,7 @@ function ZohoBooksPanel({
         updatePolling,
         sync,
         fetchJobs,
+        fetchJob,
         fetchAllInvoices,
         importInvoice,
     } = useZohoBooksStore();
@@ -468,24 +539,18 @@ function ZohoBooksPanel({
                         <p className="text-xs text-surface-900/70">No invoice jobs yet. Run a sync to pull recent invoices.</p>
                     ) : (
                         <div className="space-y-2">
-                            {jobs.map((job) => {
-                                const statusInfo = JOB_STATUS_BADGE[job.status] || { label: job.status, variant: "gray" as const };
-                                return (
-                                    <div
-                                        key={job.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm cursor-pointer hover:border-primary-100 transition-colors"
-                                        onClick={() => navigate(`/dashboard/invoices/provider/zoho-books/${job.zohoInvoiceId}`)}
-                                    >
-                                        <span className="font-medium text-surface-900">
-                                            {job.zohoInvoiceNumber || job.zohoInvoiceId}
-                                        </span>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs text-surface-900/50">{formatDate(job.updatedAt)}</span>
-                                            <Badge variant={statusInfo.variant} size="sm">{statusInfo.label}</Badge>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            {jobs.map((job) => (
+                                <JobRow
+                                    key={job.id}
+                                    source="zoho-books"
+                                    companyId={companyId}
+                                    job={job}
+                                    invoiceId={job.zohoInvoiceId}
+                                    invoiceNumber={job.zohoInvoiceNumber || job.zohoInvoiceId}
+                                    navigate={navigate}
+                                    fetchJob={fetchJob}
+                                />
+                            ))}
                         </div>
                     )}
                 </section>
@@ -556,6 +621,7 @@ function QuickBooksPanel({
         updatePolling,
         sync,
         fetchJobs,
+        fetchJob,
         fetchAllInvoices,
         importInvoice,
     } = useQuickBooksStore();
@@ -790,24 +856,18 @@ function QuickBooksPanel({
                         <p className="text-xs text-surface-900/70">No invoice jobs yet. Run a sync to pull recent invoices.</p>
                     ) : (
                         <div className="space-y-2">
-                            {jobs.map((job) => {
-                                const statusInfo = JOB_STATUS_BADGE[job.status] || { label: job.status, variant: "gray" as const };
-                                return (
-                                    <div
-                                        key={job.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm cursor-pointer hover:border-primary-100 transition-colors"
-                                        onClick={() => navigate(`/dashboard/invoices/provider/quickbooks/${job.quickbooksInvoiceId}`)}
-                                    >
-                                        <span className="font-medium text-surface-900">
-                                            {job.quickbooksInvoiceNumber || job.quickbooksInvoiceId}
-                                        </span>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs text-surface-900/50">{formatDate(job.updatedAt)}</span>
-                                            <Badge variant={statusInfo.variant} size="sm">{statusInfo.label}</Badge>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            {jobs.map((job) => (
+                                <JobRow
+                                    key={job.id}
+                                    source="quickbooks"
+                                    companyId={companyId}
+                                    job={job}
+                                    invoiceId={job.quickbooksInvoiceId}
+                                    invoiceNumber={job.quickbooksInvoiceNumber || job.quickbooksInvoiceId}
+                                    navigate={navigate}
+                                    fetchJob={fetchJob}
+                                />
+                            ))}
                         </div>
                     )}
                 </section>
@@ -883,6 +943,7 @@ function XeroPanel({
         fetchTenants,
         setTenant,
         fetchJobs,
+        fetchJob,
         fetchAllInvoices,
         importInvoice,
     } = useXeroStore();
@@ -1174,24 +1235,18 @@ function XeroPanel({
                         <p className="text-xs text-surface-900/70">No invoice jobs yet. Run a sync to pull recent invoices.</p>
                     ) : (
                         <div className="space-y-2">
-                            {jobs.map((job) => {
-                                const statusInfo = JOB_STATUS_BADGE[job.status] || { label: job.status, variant: "gray" as const };
-                                return (
-                                    <div
-                                        key={job.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm cursor-pointer hover:border-primary-100 transition-colors"
-                                        onClick={() => navigate(`/dashboard/invoices/provider/xero/${job.xeroInvoiceId}`)}
-                                    >
-                                        <span className="font-medium text-surface-900">
-                                            {job.xeroInvoiceNumber || job.xeroInvoiceId}
-                                        </span>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs text-surface-900/50">{formatDate(job.updatedAt)}</span>
-                                            <Badge variant={statusInfo.variant} size="sm">{statusInfo.label}</Badge>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            {jobs.map((job) => (
+                                <JobRow
+                                    key={job.id}
+                                    source="xero"
+                                    companyId={companyId}
+                                    job={job}
+                                    invoiceId={job.xeroInvoiceId}
+                                    invoiceNumber={job.xeroInvoiceNumber || job.xeroInvoiceId}
+                                    navigate={navigate}
+                                    fetchJob={fetchJob}
+                                />
+                            ))}
                         </div>
                     )}
                 </section>
