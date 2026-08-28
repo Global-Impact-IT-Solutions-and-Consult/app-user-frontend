@@ -107,6 +107,7 @@ interface CompanyState {
     createWebhook: (companyId: string, data: Record<string, unknown>) => Promise<Webhook>;
     updateWebhook: (companyId: string, webhookId: string, data: Record<string, unknown>) => Promise<void>;
     deleteWebhook: (companyId: string, webhookId: string) => Promise<void>;
+    regenerateWebhookSecret: (companyId: string, webhookId: string) => Promise<string>;
     testWebhook: (companyId: string, webhookId: string, eventType: string, payload?: Record<string, unknown>) => Promise<{ success: boolean; statusCode?: number; message?: string; error?: string }>;
 
     // API Keys
@@ -291,6 +292,21 @@ export const useCompanyStore = create<CompanyState>()(
                 } catch (error) {
                     console.error("Failed to delete webhook", error);
                     set({ error: (error as ApiError).response?.data?.message || 'Failed to delete webhook' });
+                    throw error;
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
+
+            regenerateWebhookSecret: async (companyId, webhookId) => {
+                set({ isLoading: true, error: null });
+                try {
+                    const response = await api.post(`/companies/${companyId}/webhooks/${webhookId}/regenerate-secret`);
+                    const result = response.data.data || response.data;
+                    return result.signingSecret as string;
+                } catch (error) {
+                    console.error("Failed to regenerate webhook secret", error);
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to regenerate webhook secret' });
                     throw error;
                 } finally {
                     set({ isLoading: false });

@@ -215,7 +215,8 @@ const ApiTab = () => {
         regenerateApiKey,
         revokeApiKey,
         updateOnboardingStep,
-        deleteWebhook
+        deleteWebhook,
+        regenerateWebhookSecret
     } = useCompanyStore();
 
     const [webhookUrl, setWebhookUrl] = React.useState("");
@@ -225,6 +226,8 @@ const ApiTab = () => {
     const [isTesting, setIsTesting] = React.useState(false);
     const [isDeletingWebhook, setIsDeletingWebhook] = React.useState(false);
     const [deleteWebhookOpen, setDeleteWebhookOpen] = React.useState(false);
+    const [isRegeneratingSecret, setIsRegeneratingSecret] = React.useState(false);
+    const [regenerateSecretOpen, setRegenerateSecretOpen] = React.useState(false);
     const { toast } = useToast();
     const { user, setEnvironment } = useAuthStore();
     const selectedEnv = user?.currentEnvironment || 'test';
@@ -352,6 +355,24 @@ const ApiTab = () => {
         } finally {
             setIsDeletingWebhook(false);
             setDeleteWebhookOpen(false);
+        }
+    };
+
+    const handleConfirmRegenerateSecret = async () => {
+        if (!currentCompany?.id || webhooks.length === 0) {
+            setRegenerateSecretOpen(false);
+            return;
+        }
+        setIsRegeneratingSecret(true);
+        try {
+            const secret = await regenerateWebhookSecret(currentCompany.id, webhooks[0].id);
+            setWebhookSecret(secret);
+            toast({ title: "Secret regenerated", description: "The old secret stopped working immediately.", variant: "success" });
+        } catch {
+            toast({ title: "Couldn't regenerate secret", variant: "error" });
+        } finally {
+            setIsRegeneratingSecret(false);
+            setRegenerateSecretOpen(false);
         }
     };
 
@@ -553,6 +574,17 @@ const ApiTab = () => {
                                         <Copy className="h-4 w-4" />
                                     </Button>
                                 )}
+                                {webhooks.length > 0 && (
+                                    <Button
+                                        variant="outline"
+                                        className="h-10 px-4 gap-2 text-primary-600 whitespace-nowrap"
+                                        onClick={() => setRegenerateSecretOpen(true)}
+                                        disabled={isRegeneratingSecret}
+                                    >
+                                        <RotateCcw className="h-4 w-4" />
+                                        Regenerate
+                                    </Button>
+                                )}
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-primary-600 font-medium mt-1">
                                 <Shield className="h-3.5 w-3.5" />
@@ -618,6 +650,15 @@ const ApiTab = () => {
                 title="Delete Webhook"
                 description="This removes the webhook entirely. You'll stop receiving events at this URL until you set up a new one."
                 confirmText="Delete Webhook"
+                variant="danger"
+            />
+            <ConfirmModal
+                isOpen={regenerateSecretOpen}
+                onClose={() => setRegenerateSecretOpen(false)}
+                onConfirm={handleConfirmRegenerateSecret}
+                title="Regenerate Webhook Secret"
+                description="The old secret stops working immediately. Any integration verifying signatures with it will break until it's updated with the new one."
+                confirmText="Regenerate Secret"
                 variant="danger"
             />
         </div>
