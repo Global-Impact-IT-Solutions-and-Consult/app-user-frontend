@@ -58,7 +58,7 @@ interface Company {
     approvedAt: string | null;
     approvedBy: string | null;
     isActive: boolean;
-    onboardingSteps: Record<string, unknown>;
+    onboardingSteps: Record<string, boolean>;
     createdAt: string;
     updatedAt: string;
     members: CompanyMember[];
@@ -95,6 +95,7 @@ interface CompanyState {
     // Actions
     createCompany: (data: Record<string, unknown>) => Promise<void>;
     updateCompany: (id: string, data: Record<string, unknown>) => Promise<void>;
+    updateOnboardingStep: (id: string, step: string, completed: boolean) => Promise<void>;
     fetchCompanies: () => Promise<void>;
     setCurrentCompany: (company: Company) => void;
     fetchCompanyMembers: (companyId: string) => Promise<void>;
@@ -165,6 +166,24 @@ export const useCompanyStore = create<CompanyState>()(
                 }
             },
 
+            updateOnboardingStep: async (id, step, completed) => {
+                try {
+                    const response = await api.put(`/companies/${id}/onboarding/${step}`, { completed });
+                    const result = response.data.data || response.data;
+                    set(state => ({
+                        currentCompany: state.currentCompany?.id === id
+                            ? { ...state.currentCompany, onboardingSteps: result?.onboardingSteps ?? state.currentCompany.onboardingSteps }
+                            : state.currentCompany,
+                        companies: state.companies.map(c => c.id === id
+                            ? { ...c, onboardingSteps: result?.onboardingSteps ?? c.onboardingSteps }
+                            : c),
+                    }));
+                } catch (error) {
+                    console.error("Failed to update onboarding step", error);
+                    throw error;
+                }
+            },
+
             fetchCompanyMembers: async () => {
                 // Placeholder
             },
@@ -186,13 +205,21 @@ export const useCompanyStore = create<CompanyState>()(
                 try {
                     const response = await api.get('/companies');
                     console.log("Companies:", response);
-                    const result = response.data.data
+                    const result: Company[] = response.data.data
                     console.log("Companies result:", result);
                     set({ companies: result });
 
-                    // Auto-select first company if none selected and list is not empty
-                    if (result.length > 0 && !useCompanyStore.getState().currentCompany) {
-                        set({ currentCompany: result[0] });
+                    // Always resync currentCompany with fresh server data - it was
+                    // previously only ever set once (when null) and never refreshed,
+                    // so onboardingSteps and everything else on it could go stale
+                    // across logins/reloads. The Dashboard banner depends on this
+                    // being accurate.
+                    if (Array.isArray(result) && result.length > 0) {
+                        const current = useCompanyStore.getState().currentCompany;
+                        const freshCurrent = current ? result.find(c => c.id === current.id) : undefined;
+                        set({ currentCompany: freshCurrent || result[0] });
+                    } else {
+                        set({ currentCompany: null });
                     }
 
                 } catch (error) {

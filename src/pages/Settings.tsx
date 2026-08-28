@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useLocation } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
@@ -27,6 +28,7 @@ import { useToast } from "../components/ui/Toast";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { MfaSetupModal } from "../components/MfaSetupModal";
 import { DisableMfaModal } from "../components/DisableMfaModal";
+import { isApiSetupComplete } from "../lib/onboarding";
 
 const tabs = [
     { label: "General", id: "general" },
@@ -37,7 +39,9 @@ const tabs = [
 ];
 
 export default function Settings() {
-    const [activeTab, setActiveTab] = React.useState("general");
+    const location = useLocation();
+    const initialTab = (location.state as { tab?: string } | null)?.tab;
+    const [activeTab, setActiveTab] = React.useState(initialTab || "general");
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -207,7 +211,8 @@ const ApiTab = () => {
         createWebhook,
         updateWebhook,
         testWebhook,
-        regenerateApiKey
+        regenerateApiKey,
+        updateOnboardingStep
     } = useCompanyStore();
 
     const [webhookUrl, setWebhookUrl] = React.useState("");
@@ -245,6 +250,23 @@ const ApiTab = () => {
 
     const [regenerateKeyId, setRegenerateKeyId] = React.useState<string | null>(null);
 
+    // API setup only counts as done once both a key and a webhook exist -
+    // called after either succeeds here, using the latest known state of both.
+    const maybeMarkApiSetupComplete = async () => {
+        if (!currentCompany?.id) return;
+        const state = useCompanyStore.getState();
+        const hasApiKey = !!state.companySettings?.settings?.find(s => s.type === 'test')?.publicKey;
+        const hasWebhook = state.webhooks.length > 0;
+        if (isApiSetupComplete(hasApiKey, hasWebhook)) {
+            try {
+                await updateOnboardingStep(currentCompany.id, "api_setup", true);
+            } catch (err) {
+                console.error("Failed to mark api_setup complete:", err);
+                // Non-blocking - only feeds the Dashboard's finish-setup banner.
+            }
+        }
+    };
+
     const handleConfirmRegenerate = async () => {
         if (regenerateKeyId && currentCompany?.id && user?.id) {
             const setting = companySettings?.settings.find(s => s.id === regenerateKeyId);
@@ -252,7 +274,8 @@ const ApiTab = () => {
                 try {
                     await regenerateApiKey(currentCompany.id, setting.type);
                     toast({ title: "Key Regenerated", description: "API Key has been regenerated successfully.", variant: "success" });
-                    fetchCompanySettings(currentCompany.id);
+                    await fetchCompanySettings(currentCompany.id);
+                    await maybeMarkApiSetupComplete();
                 } catch {
                     toast({ title: "Regeneration Failed", variant: "error" });
                 }
@@ -286,6 +309,7 @@ const ApiTab = () => {
                 }
                 toast({ title: "Webhook created", description: "New webhook endpoint has been registered.", variant: "success" });
             }
+            await maybeMarkApiSetupComplete();
         } catch {
             toast({ title: "Operation failed", description: "Failed to save webhook configuration.", variant: "error" });
         } finally {

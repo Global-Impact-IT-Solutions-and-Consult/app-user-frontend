@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useReceiptStore } from "../store/receiptStore";
 import { useLogStore } from "../store/logStore";
+import { OnboardingBanner } from "../components/OnboardingBanner";
 
 export default function Dashboard() {
     const [isTimelineSettingsOpen, setIsTimelineSettingsOpen] = React.useState(false);
@@ -62,6 +63,8 @@ export default function Dashboard() {
                         </Button>
                     </div>
                 </header>
+
+                <OnboardingBanner />
 
                 {/* Stats */}
                 <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

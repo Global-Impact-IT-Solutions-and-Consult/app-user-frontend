@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Copy, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import { useCompanyStore } from "../store/companyStore";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { useToast } from "./ui/Toast";
@@ -12,6 +13,7 @@ interface MfaSetupModalProps {
 
 export const MfaSetupModal = ({ isOpen, onClose }: MfaSetupModalProps) => {
     const { setupMfa, enableMfa } = useAuthStore();
+    const { currentCompany, updateOnboardingStep } = useCompanyStore();
     const { toast } = useToast();
 
     const [step, setStep] = useState<'loading' | 'scan' | 'verify' | 'success'>('loading');
@@ -56,6 +58,15 @@ export const MfaSetupModal = ({ isOpen, onClose }: MfaSetupModalProps) => {
             await enableMfa(otp, secret);
             setStep('success');
             toast({ title: "MFA Enabled", description: "Two-factor authentication is now active.", variant: "success" });
+            if (currentCompany?.id) {
+                try {
+                    await updateOnboardingStep(currentCompany.id, "security", true);
+                } catch (err) {
+                    console.error("Failed to mark security complete:", err);
+                    // Non-blocking - MFA is genuinely enabled either way, this only
+                    // feeds the Dashboard's finish-setup banner.
+                }
+            }
             setTimeout(() => {
                 onClose();
             }, 2000);

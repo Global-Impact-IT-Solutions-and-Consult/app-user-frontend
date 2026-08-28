@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { jwtDecode } from 'jwt-decode';
 import api from '../lib/api';
+import { useCompanyStore } from './companyStore';
 
 interface User {
     id: string;
@@ -168,6 +169,16 @@ export const useAuthStore = create<AuthState>()(
                     tempToken: null,
                     userId: null,
                     requiresMfa: false
+                });
+                // Company data is per-account and must not survive a logout - otherwise
+                // it (and stale onboardingSteps within it) could leak into whoever logs
+                // in next on this browser.
+                useCompanyStore.setState({
+                    companies: [],
+                    currentCompany: null,
+                    companySettings: null,
+                    webhooks: [],
+                    apiKeys: [],
                 });
             },
 

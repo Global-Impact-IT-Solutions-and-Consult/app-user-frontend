@@ -23,10 +23,13 @@ import {
 import { cn } from "../lib/utils";
 import { useAuthStore } from "../store/authStore";
 import { Smartphone } from "lucide-react";
+import { useToast } from "../components/ui/Toast";
+import { isApiSetupComplete } from "../lib/onboarding";
 
 export default function OnboardingFlow() {
     const navigate = useNavigate();
-    const { createCompany, isLoading, error } = useCompanyStore();
+    const { toast } = useToast();
+    const { createCompany, currentCompany, updateOnboardingStep, isLoading, error } = useCompanyStore();
     const [step, setStep] = useState(1);
     const totalSteps = 3; // 1. Company, 2. Security, 3. API/Done
 
@@ -63,9 +66,23 @@ export default function OnboardingFlow() {
                 contactEmail: companyData.contactEmail || undefined,
                 contactPhone: companyData.contactPhone || undefined,
             });
+            const newCompanyId = useCompanyStore.getState().currentCompany?.id;
+            if (newCompanyId) {
+                try {
+                    await updateOnboardingStep(newCompanyId, "company_info", true);
+                } catch (err) {
+                    console.error("Failed to mark company_info complete:", err);
+                    // Non-blocking - this only feeds the Dashboard's finish-setup banner.
+                }
+            }
             nextStep(); // Move to success/next step
-        } catch {
-            // console.error(_e);
+        } catch (err) {
+            console.error("Failed to create company:", err);
+            toast({
+                title: "Couldn't save your company",
+                description: "Something went wrong creating your company. Please try again.",
+                variant: "error",
+            });
         }
     };
 
@@ -133,7 +150,21 @@ export default function OnboardingFlow() {
                                 updateData={updateCompanyData}
                             />
                         )}
-                        {step === 2 && <SecurityStep onComplete={nextStep} />}
+                        {step === 2 && (
+                            <SecurityStep
+                                onComplete={async () => {
+                                    if (currentCompany?.id) {
+                                        try {
+                                            await updateOnboardingStep(currentCompany.id, "security", true);
+                                        } catch (err) {
+                                            console.error("Failed to mark security complete:", err);
+                                            // Non-blocking - only feeds the Dashboard's finish-setup banner.
+                                        }
+                                    }
+                                    nextStep();
+                                }}
+                            />
+                        )}
                         {step === 3 && <APISetupStep />}
                     </div>
 
@@ -289,7 +320,8 @@ function CompanyInfoStep({ data, updateData }: {
 
 function APISetupStep() {
     const [env, setEnv] = useState<"test" | "live">("test");
-    const { currentCompany, companySettings, fetchWebhooks, createWebhook, updateWebhook, webhooks, isLoading, regenerateApiKey } = useCompanyStore();
+    const { currentCompany, companySettings, fetchWebhooks, createWebhook, updateWebhook, webhooks, isLoading, regenerateApiKey, updateOnboardingStep } = useCompanyStore();
+    const { toast } = useToast();
     const [showKey, setShowKey] = useState(false);
     const [apiKeyCopied, setApiKeyCopied] = useState(false);
     const [webhookCopied, setWebhookCopied] = useState(false);
@@ -336,11 +368,27 @@ function APISetupStep() {
         }
     };
 
+    const maybeMarkApiSetupComplete = async () => {
+        if (!currentCompany?.id) return;
+        const state = useCompanyStore.getState();
+        const hasApiKey = !!state.companySettings?.settings?.find(s => s.type === 'test')?.publicKey;
+        const hasWebhook = state.webhooks.length > 0;
+        if (isApiSetupComplete(hasApiKey, hasWebhook)) {
+            try {
+                await updateOnboardingStep(currentCompany.id, "api_setup", true);
+            } catch (err) {
+                console.error("Failed to mark api_setup complete:", err);
+                // Non-blocking - only feeds the Dashboard's finish-setup banner.
+            }
+        }
+    };
+
     const generateKey = async () => {
         if (currentCompany?.id) {
             await regenerateApiKey(currentCompany.id, 'test');
             setShowKey(true);
             setTimeout(() => setShowKey(false), 2000);
+            await maybeMarkApiSetupComplete();
         }
     };
 
@@ -365,9 +413,11 @@ function APISetupStep() {
                 setWebhookUrl(result.url);
                 setWebhookCopied(false);
             }
-            // Ideally show success toast here
+            toast({ title: "Webhook saved", variant: "success" });
+            await maybeMarkApiSetupComplete();
         } catch (e) {
             console.error("Failed to save webhook", e);
+            toast({ title: "Couldn't save webhook", description: "Please check the URL and try again.", variant: "error" });
         }
     };
 
