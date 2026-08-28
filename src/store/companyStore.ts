@@ -106,6 +106,7 @@ interface CompanyState {
     fetchWebhooks: (companyId: string) => Promise<void>;
     createWebhook: (companyId: string, data: Record<string, unknown>) => Promise<Webhook>;
     updateWebhook: (companyId: string, webhookId: string, data: Record<string, unknown>) => Promise<void>;
+    deleteWebhook: (companyId: string, webhookId: string) => Promise<void>;
     testWebhook: (companyId: string, webhookId: string, eventType: string, payload?: Record<string, unknown>) => Promise<{ success: boolean; statusCode?: number; message?: string; error?: string }>;
 
     // API Keys
@@ -276,6 +277,20 @@ export const useCompanyStore = create<CompanyState>()(
                 } catch (error) {
                     console.error("Failed to update webhook", error);
                     set({ error: (error as ApiError).response?.data?.message || 'Failed to update webhook' });
+                    throw error;
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
+
+            deleteWebhook: async (companyId, webhookId) => {
+                set({ isLoading: true, error: null });
+                try {
+                    await api.delete(`/companies/${companyId}/webhooks/${webhookId}`);
+                    set(state => ({ webhooks: state.webhooks.filter(w => w.id !== webhookId) }));
+                } catch (error) {
+                    console.error("Failed to delete webhook", error);
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to delete webhook' });
                     throw error;
                 } finally {
                     set({ isLoading: false });

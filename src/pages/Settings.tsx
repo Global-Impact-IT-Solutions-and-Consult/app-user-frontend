@@ -214,7 +214,8 @@ const ApiTab = () => {
         testWebhook,
         regenerateApiKey,
         revokeApiKey,
-        updateOnboardingStep
+        updateOnboardingStep,
+        deleteWebhook
     } = useCompanyStore();
 
     const [webhookUrl, setWebhookUrl] = React.useState("");
@@ -222,6 +223,8 @@ const ApiTab = () => {
     const [webhookSecret, setWebhookSecret] = React.useState("");
     const [isSaving, setIsSaving] = React.useState(false);
     const [isTesting, setIsTesting] = React.useState(false);
+    const [isDeletingWebhook, setIsDeletingWebhook] = React.useState(false);
+    const [deleteWebhookOpen, setDeleteWebhookOpen] = React.useState(false);
     const { toast } = useToast();
     const { user, setEnvironment } = useAuthStore();
     const selectedEnv = user?.currentEnvironment || 'test';
@@ -330,6 +333,25 @@ const ApiTab = () => {
             toast({ title: "Operation failed", description: "Failed to save webhook configuration.", variant: "error" });
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleConfirmDeleteWebhook = async () => {
+        if (!currentCompany?.id || webhooks.length === 0) {
+            setDeleteWebhookOpen(false);
+            return;
+        }
+        setIsDeletingWebhook(true);
+        try {
+            await deleteWebhook(currentCompany.id, webhooks[0].id);
+            setWebhookUrl("");
+            setWebhookSecret("");
+            toast({ title: "Webhook deleted", description: "You'll stop receiving events at this URL.", variant: "success" });
+        } catch {
+            toast({ title: "Couldn't delete webhook", variant: "error" });
+        } finally {
+            setIsDeletingWebhook(false);
+            setDeleteWebhookOpen(false);
         }
     };
 
@@ -554,7 +576,17 @@ const ApiTab = () => {
                             </Button>
                         </div>
 
-                        <div className="flex justify-end pt-4 border-t border-surface-100">
+                        <div className="flex justify-end gap-3 pt-4 border-t border-surface-100">
+                            {webhooks.length > 0 && (
+                                <Button
+                                    variant="danger"
+                                    className="font-bold h-11 px-6 bg-danger-50 text-danger-500 border-none hover:bg-danger-100"
+                                    onClick={() => setDeleteWebhookOpen(true)}
+                                    disabled={isSaving || isDeletingWebhook}
+                                >
+                                    Delete Webhook
+                                </Button>
+                            )}
                             <Button className="font-bold h-11 px-8" onClick={handleSaveWebhook} disabled={isSaving}>
                                 {isSaving ? "Saving..." : (webhooks.length > 0 ? "Update Webhook" : "Create Webhook")}
                             </Button>
@@ -577,6 +609,15 @@ const ApiTab = () => {
                 title="Revoke API Key"
                 description="This key will stop working immediately, with no replacement issued. Anything using it will break until you generate a new one."
                 confirmText="Revoke Key"
+                variant="danger"
+            />
+            <ConfirmModal
+                isOpen={deleteWebhookOpen}
+                onClose={() => setDeleteWebhookOpen(false)}
+                onConfirm={handleConfirmDeleteWebhook}
+                title="Delete Webhook"
+                description="This removes the webhook entirely. You'll stop receiving events at this URL until you set up a new one."
+                confirmText="Delete Webhook"
                 variant="danger"
             />
         </div>
