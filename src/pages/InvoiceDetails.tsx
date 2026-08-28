@@ -24,6 +24,7 @@ export default function InvoiceDetails() {
         currentReceiptLogs,
         isLoading,
         fetchReceipt,
+        fetchReceiptStatus,
         fetchReceiptLogs,
         downloadReceipt
     } = useReceiptStore();
@@ -34,6 +35,21 @@ export default function InvoiceDetails() {
             fetchReceiptLogs(id);
         }
     }, [id, fetchReceipt, fetchReceiptLogs]);
+
+    // Lightweight polling while the receipt hasn't reached a final state -
+    // stops itself once status becomes completed/failed (the effect just
+    // re-runs, sees the final status, and doesn't set a new interval).
+    React.useEffect(() => {
+        if (!id) return;
+        const status = currentReceipt?.status?.toLowerCase();
+        if (!status || status === "completed" || status === "failed") return;
+
+        const interval = setInterval(() => {
+            fetchReceiptStatus(id);
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [id, currentReceipt?.status, fetchReceiptStatus]);
 
     const handleDownload = async (format: string) => {
         if (id) {

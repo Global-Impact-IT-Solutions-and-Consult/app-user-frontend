@@ -43,6 +43,7 @@ interface ReceiptState {
     // Actions
     fetchReceipts: (params?: Record<string, unknown>) => Promise<void>;
     fetchReceipt: (id: string) => Promise<void>;
+    fetchReceiptStatus: (id: string) => Promise<void>;
     fetchReceiptLogs: (id: string, params?: Record<string, unknown>) => Promise<void>;
     downloadReceipt: (id: string, format?: string) => Promise<void>;
 }
@@ -88,6 +89,25 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
             set({ error: (error as ApiError).response?.data?.message || 'Failed to fetch invoice details' });
         } finally {
             set({ isLoading: false });
+        }
+    },
+
+    fetchReceiptStatus: async (id) => {
+        // Deliberately doesn't touch isLoading/error - used for lightweight
+        // background polling while a receipt is still processing, not a
+        // user-visible full reload.
+        try {
+            const response = await api.get(`/receipts/${id}/status`);
+            const result = response.data.data || response.data;
+            const status = typeof result === 'string' ? result : result?.status;
+            if (!status) return;
+            set(state => ({
+                currentReceipt: state.currentReceipt?.id === id
+                    ? { ...state.currentReceipt, status }
+                    : state.currentReceipt,
+            }));
+        } catch (error) {
+            console.error("Failed to fetch receipt status", error);
         }
     },
 
