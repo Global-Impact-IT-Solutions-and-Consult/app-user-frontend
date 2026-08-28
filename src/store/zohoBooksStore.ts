@@ -52,6 +52,13 @@ interface ZohoBooksState {
     isLoadingInvoice: boolean;
     invoiceError: string | null;
 
+    // Full-account invoice browsing (GET .../invoices) - separate from the
+    // sync job pipeline, lets a user import something the sync never touched.
+    allInvoices: Record<string, unknown>[];
+    allInvoicesPage: number;
+    hasMoreInvoices: boolean;
+    isLoadingAllInvoices: boolean;
+
     isLoading: boolean;
     isSyncing: boolean;
     error: string | null;
@@ -63,6 +70,8 @@ interface ZohoBooksState {
     sync: (companyId: string) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
     fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
+    fetchAllInvoices: (companyId: string, page?: number, append?: boolean) => Promise<void>;
+    importInvoice: (companyId: string, invoiceId: string) => Promise<void>;
 }
 
 export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
@@ -82,6 +91,11 @@ export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
     currentInvoice: null,
     isLoadingInvoice: false,
     invoiceError: null,
+
+    allInvoices: [],
+    allInvoicesPage: 1,
+    hasMoreInvoices: false,
+    isLoadingAllInvoices: false,
 
     isLoading: false,
     isSyncing: false,
@@ -205,6 +219,35 @@ export const useZohoBooksStore = create<ZohoBooksState>()((set) => ({
             });
         } finally {
             set({ isLoadingInvoice: false });
+        }
+    },
+
+    fetchAllInvoices: async (companyId, page = 1, append = false) => {
+        set({ isLoadingAllInvoices: true, error: null });
+        try {
+            const response = await api.get(`/zoho-books/${companyId}/invoices`, { params: { page, perPage: 25 } });
+            const result = response.data.data || response.data;
+            const invoices: Record<string, unknown>[] = Array.isArray(result?.invoices) ? result.invoices : [];
+            set(state => ({
+                allInvoices: append ? [...state.allInvoices, ...invoices] : invoices,
+                allInvoicesPage: page,
+                hasMoreInvoices: invoices.length >= 25,
+            }));
+        } catch (error) {
+            console.error("Failed to fetch Zoho Books invoices", error);
+            throw error;
+        } finally {
+            set({ isLoadingAllInvoices: false });
+        }
+    },
+
+    importInvoice: async (companyId, invoiceId) => {
+        try {
+            await api.post(`/zoho-books/${companyId}/invoices/${invoiceId}/import`);
+            await useZohoBooksStore.getState().fetchJobs(companyId, 1, 5);
+        } catch (error) {
+            console.error("Failed to import Zoho Books invoice", error);
+            throw error;
         }
     },
 }));

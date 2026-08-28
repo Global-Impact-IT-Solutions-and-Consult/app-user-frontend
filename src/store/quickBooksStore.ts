@@ -52,6 +52,14 @@ interface QuickBooksState {
     isLoadingInvoice: boolean;
     invoiceError: string | null;
 
+    // Full-account invoice browsing (GET .../invoices) - separate from the
+    // sync job pipeline. QuickBooks' endpoint is a flat maxResults list, not
+    // true pagination, so hasMoreInvoices is always false here.
+    allInvoices: Record<string, unknown>[];
+    allInvoicesPage: number;
+    hasMoreInvoices: boolean;
+    isLoadingAllInvoices: boolean;
+
     isLoading: boolean;
     isSyncing: boolean;
     error: string | null;
@@ -63,6 +71,8 @@ interface QuickBooksState {
     sync: (companyId: string) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
     fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
+    fetchAllInvoices: (companyId: string, page?: number, append?: boolean) => Promise<void>;
+    importInvoice: (companyId: string, invoiceId: string) => Promise<void>;
 }
 
 export const useQuickBooksStore = create<QuickBooksState>()((set) => ({
@@ -83,6 +93,11 @@ export const useQuickBooksStore = create<QuickBooksState>()((set) => ({
     currentInvoice: null,
     isLoadingInvoice: false,
     invoiceError: null,
+
+    allInvoices: [],
+    allInvoicesPage: 1,
+    hasMoreInvoices: false,
+    isLoadingAllInvoices: false,
 
     isLoading: false,
     isSyncing: false,
@@ -205,6 +220,34 @@ export const useQuickBooksStore = create<QuickBooksState>()((set) => ({
             });
         } finally {
             set({ isLoadingInvoice: false });
+        }
+    },
+
+    // QuickBooks' list endpoint is a flat "most recently updated" query with
+    // no real page offset (see quickbooks.service.ts listInvoices) - always
+    // refetches the same top set rather than paginating.
+    fetchAllInvoices: async (companyId) => {
+        set({ isLoadingAllInvoices: true, error: null });
+        try {
+            const response = await api.get(`/quickbooks/${companyId}/invoices`, { params: { maxResults: 50 } });
+            const result = response.data.data || response.data;
+            const invoices: Record<string, unknown>[] = Array.isArray(result?.invoices) ? result.invoices : [];
+            set({ allInvoices: invoices, allInvoicesPage: 1, hasMoreInvoices: false });
+        } catch (error) {
+            console.error("Failed to fetch QuickBooks invoices", error);
+            throw error;
+        } finally {
+            set({ isLoadingAllInvoices: false });
+        }
+    },
+
+    importInvoice: async (companyId, invoiceId) => {
+        try {
+            await api.post(`/quickbooks/${companyId}/invoices/${invoiceId}/import`);
+            await useQuickBooksStore.getState().fetchJobs(companyId, 1, 5);
+        } catch (error) {
+            console.error("Failed to import QuickBooks invoice", error);
+            throw error;
         }
     },
 }));

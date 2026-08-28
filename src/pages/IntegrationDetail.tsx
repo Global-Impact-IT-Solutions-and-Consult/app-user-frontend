@@ -12,6 +12,7 @@ import { useQuickBooksStore, type QuickBooksJobStatus } from "../store/quickBook
 import { useXeroStore, type XeroJobStatus } from "../store/xeroStore";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { INTEGRATION_SERVICES } from "../lib/integrations";
+import { getString, getProviderInvoiceId, type ProviderSource } from "../lib/providerInvoice";
 
 const JOB_STATUS_BADGE: Record<ZohoJobStatus | QuickBooksJobStatus | XeroJobStatus, { label: string; variant: "gray" | "success" | "warning" | "danger" | "primary" }> = {
     imported: { label: "Imported", variant: "gray" },
@@ -26,6 +27,141 @@ const JOB_STATUS_BADGE: Record<ZohoJobStatus | QuickBooksJobStatus | XeroJobStat
 function formatDate(value: string | null) {
     if (!value) return "—";
     return new Date(value).toLocaleString();
+}
+
+// Shared across all three provider panels: browse every invoice in the
+// connected account (not just what's synced) and import one on demand.
+function AllInvoicesSection({
+    source,
+    companyId,
+    navigate,
+    toast,
+    allInvoices,
+    isLoadingAllInvoices,
+    hasMoreInvoices,
+    currentPage,
+    fetchAllInvoices,
+    importInvoice,
+    existingInvoiceIds,
+}: {
+    source: ProviderSource;
+    companyId: string;
+    navigate: ReturnType<typeof useNavigate>;
+    toast: ReturnType<typeof useToast>["toast"];
+    allInvoices: Record<string, unknown>[];
+    isLoadingAllInvoices: boolean;
+    hasMoreInvoices: boolean;
+    currentPage: number;
+    fetchAllInvoices: (companyId: string, page?: number, append?: boolean) => Promise<void>;
+    importInvoice: (companyId: string, invoiceId: string) => Promise<void>;
+    existingInvoiceIds: Set<string>;
+}) {
+    const [loaded, setLoaded] = React.useState(false);
+    const [importingId, setImportingId] = React.useState<string | null>(null);
+
+    const handleLoad = async () => {
+        try {
+            await fetchAllInvoices(companyId, 1);
+            setLoaded(true);
+        } catch {
+            toast({ title: "Couldn't load invoices", description: "Failed to fetch invoices from the connected account.", variant: "error" });
+        }
+    };
+
+    const handleLoadMore = async () => {
+        try {
+            await fetchAllInvoices(companyId, currentPage + 1, true);
+        } catch {
+            toast({ title: "Couldn't load more invoices", variant: "error" });
+        }
+    };
+
+    const handleImport = async (invoiceId: string) => {
+        setImportingId(invoiceId);
+        try {
+            await importInvoice(companyId, invoiceId);
+            toast({ title: "Invoice imported", description: "Pulled into the receipt pipeline.", variant: "success" });
+        } catch {
+            toast({ title: "Import failed", description: "Couldn't import this invoice.", variant: "error" });
+        } finally {
+            setImportingId(null);
+        }
+    };
+
+    return (
+        <section className="space-y-3">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-sm font-bold text-surface-900">Browse All Invoices</h3>
+                    <p className="text-xs text-surface-900/60">Everything in the connected account, not just what's synced.</p>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 font-bold"
+                    onClick={handleLoad}
+                    isLoading={isLoadingAllInvoices && !loaded}
+                >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    {loaded ? "Refresh" : "Load"}
+                </Button>
+            </div>
+
+            {loaded && allInvoices.length === 0 && (
+                <p className="text-xs text-surface-900/70">No invoices found in this account.</p>
+            )}
+
+            {allInvoices.length > 0 && (
+                <div className="space-y-2">
+                    {allInvoices.map((invoice, i) => {
+                        const invoiceId = getProviderInvoiceId(invoice, source);
+                        const invoiceNumber = getString(invoice, ["invoice_number", "DocNumber", "InvoiceNumber"]) || invoiceId;
+                        const customer = getString(invoice, ["customer_name", "CustomerRef", "Contact"]);
+                        const alreadyImported = existingInvoiceIds.has(invoiceId);
+                        return (
+                            <div key={invoiceId || i} className="flex items-center justify-between p-3 rounded-lg border border-surface-100 text-sm">
+                                <div className="space-y-0.5">
+                                    <p className="font-medium text-surface-900">{invoiceNumber || "—"}</p>
+                                    {customer && <p className="text-xs text-surface-900/50">{customer}</p>}
+                                </div>
+                                {alreadyImported ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="font-bold"
+                                        onClick={() => navigate(`/dashboard/invoices/provider/${source}/${invoiceId}`)}
+                                    >
+                                        View
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        className="font-bold"
+                                        onClick={() => handleImport(invoiceId)}
+                                        isLoading={importingId === invoiceId}
+                                        disabled={!invoiceId}
+                                    >
+                                        Import
+                                    </Button>
+                                )}
+                            </div>
+                        );
+                    })}
+                    {hasMoreInvoices && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full"
+                            onClick={handleLoadMore}
+                            isLoading={isLoadingAllInvoices && loaded}
+                        >
+                            Load more
+                        </Button>
+                    )}
+                </div>
+            )}
+        </section>
+    );
 }
 
 export default function IntegrationDetail() {
@@ -122,12 +258,18 @@ function ZohoBooksPanel({
         isSyncing,
         error,
         jobs,
+        allInvoices,
+        allInvoicesPage,
+        hasMoreInvoices,
+        isLoadingAllInvoices,
         fetchStatus,
         connect,
         disconnect,
         updatePolling,
         sync,
         fetchJobs,
+        fetchAllInvoices,
+        importInvoice,
     } = useZohoBooksStore();
 
     const [showDisconnectConfirm, setShowDisconnectConfirm] = React.useState(false);
@@ -349,6 +491,22 @@ function ZohoBooksPanel({
                 </section>
             )}
 
+            {connected && (
+                <AllInvoicesSection
+                    source="zoho-books"
+                    companyId={companyId}
+                    navigate={navigate}
+                    toast={toast}
+                    allInvoices={allInvoices}
+                    isLoadingAllInvoices={isLoadingAllInvoices}
+                    hasMoreInvoices={hasMoreInvoices}
+                    currentPage={allInvoicesPage}
+                    fetchAllInvoices={fetchAllInvoices}
+                    importInvoice={importInvoice}
+                    existingInvoiceIds={new Set(jobs.map((job) => job.zohoInvoiceId))}
+                />
+            )}
+
             <ConfirmModal
                 isOpen={showDisconnectConfirm}
                 onClose={() => setShowDisconnectConfirm(false)}
@@ -388,12 +546,18 @@ function QuickBooksPanel({
         isSyncing,
         error,
         jobs,
+        allInvoices,
+        allInvoicesPage,
+        hasMoreInvoices,
+        isLoadingAllInvoices,
         fetchStatus,
         connect,
         disconnect,
         updatePolling,
         sync,
         fetchJobs,
+        fetchAllInvoices,
+        importInvoice,
     } = useQuickBooksStore();
 
     const [showDisconnectConfirm, setShowDisconnectConfirm] = React.useState(false);
@@ -649,6 +813,22 @@ function QuickBooksPanel({
                 </section>
             )}
 
+            {connected && (
+                <AllInvoicesSection
+                    source="quickbooks"
+                    companyId={companyId}
+                    navigate={navigate}
+                    toast={toast}
+                    allInvoices={allInvoices}
+                    isLoadingAllInvoices={isLoadingAllInvoices}
+                    hasMoreInvoices={hasMoreInvoices}
+                    currentPage={allInvoicesPage}
+                    fetchAllInvoices={fetchAllInvoices}
+                    importInvoice={importInvoice}
+                    existingInvoiceIds={new Set(jobs.map((job) => job.quickbooksInvoiceId))}
+                />
+            )}
+
             <ConfirmModal
                 isOpen={showDisconnectConfirm}
                 onClose={() => setShowDisconnectConfirm(false)}
@@ -691,6 +871,10 @@ function XeroPanel({
         isLoadingTenants,
         error,
         jobs,
+        allInvoices,
+        allInvoicesPage,
+        hasMoreInvoices,
+        isLoadingAllInvoices,
         fetchStatus,
         connect,
         disconnect,
@@ -699,6 +883,8 @@ function XeroPanel({
         fetchTenants,
         setTenant,
         fetchJobs,
+        fetchAllInvoices,
+        importInvoice,
     } = useXeroStore();
 
     const [showDisconnectConfirm, setShowDisconnectConfirm] = React.useState(false);
@@ -1009,6 +1195,22 @@ function XeroPanel({
                         </div>
                     )}
                 </section>
+            )}
+
+            {connected && (
+                <AllInvoicesSection
+                    source="xero"
+                    companyId={companyId}
+                    navigate={navigate}
+                    toast={toast}
+                    allInvoices={allInvoices}
+                    isLoadingAllInvoices={isLoadingAllInvoices}
+                    hasMoreInvoices={hasMoreInvoices}
+                    currentPage={allInvoicesPage}
+                    fetchAllInvoices={fetchAllInvoices}
+                    importInvoice={importInvoice}
+                    existingInvoiceIds={new Set(jobs.map((job) => job.xeroInvoiceId))}
+                />
             )}
 
             <ConfirmModal

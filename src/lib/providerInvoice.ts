@@ -44,3 +44,14 @@ export function getLineItems(payload: Record<string, unknown> | null | undefined
     const value = payload[key];
     return Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
 }
+
+// Each provider's own invoice ID field, on a raw invoice object from
+// GET .../invoices (the full-account list, not a sync job).
+export function getProviderInvoiceId(invoice: Record<string, unknown> | null | undefined, source: ProviderSource): string {
+    if (!invoice) return "";
+    const key = source === "zoho-books" ? "invoice_id" : source === "quickbooks" ? "Id" : "InvoiceID";
+    const value = invoice[key];
+    if (typeof value === "string") return value;
+    if (typeof value === "number") return String(value);
+    return "";
+}

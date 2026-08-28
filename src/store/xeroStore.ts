@@ -63,6 +63,15 @@ interface XeroState {
     isLoadingInvoice: boolean;
     invoiceError: string | null;
 
+    // Full-account invoice browsing (GET .../invoices) - separate from the
+    // sync job pipeline. Xero's own API paginates ~100/page; pageSize sent
+    // here isn't actually honored server-side (xero.service.ts listInvoices
+    // takes it as `_pageSize`, unused) but page does work.
+    allInvoices: Record<string, unknown>[];
+    allInvoicesPage: number;
+    hasMoreInvoices: boolean;
+    isLoadingAllInvoices: boolean;
+
     isLoading: boolean;
     isSyncing: boolean;
     isLoadingTenants: boolean;
@@ -77,6 +86,8 @@ interface XeroState {
     setTenant: (companyId: string, tenant: XeroTenant) => Promise<void>;
     fetchJobs: (companyId: string, page?: number, perPage?: number) => Promise<void>;
     fetchInvoice: (companyId: string, invoiceId: string) => Promise<void>;
+    fetchAllInvoices: (companyId: string, page?: number, append?: boolean) => Promise<void>;
+    importInvoice: (companyId: string, invoiceId: string) => Promise<void>;
 }
 
 const getErrorMessage = (error: unknown, fallback: string) =>
@@ -102,6 +113,11 @@ export const useXeroStore = create<XeroState>()((set) => ({
     currentInvoice: null,
     isLoadingInvoice: false,
     invoiceError: null,
+
+    allInvoices: [],
+    allInvoicesPage: 1,
+    hasMoreInvoices: false,
+    isLoadingAllInvoices: false,
 
     isLoading: false,
     isSyncing: false,
@@ -264,6 +280,35 @@ export const useXeroStore = create<XeroState>()((set) => ({
             });
         } finally {
             set({ isLoadingInvoice: false });
+        }
+    },
+
+    fetchAllInvoices: async (companyId, page = 1, append = false) => {
+        set({ isLoadingAllInvoices: true, error: null });
+        try {
+            const response = await api.get(`/xero/${companyId}/invoices`, { params: { page } });
+            const result = response.data.data || response.data;
+            const invoices: Record<string, unknown>[] = Array.isArray(result?.invoices) ? result.invoices : [];
+            set(state => ({
+                allInvoices: append ? [...state.allInvoices, ...invoices] : invoices,
+                allInvoicesPage: page,
+                hasMoreInvoices: invoices.length >= 25,
+            }));
+        } catch (error) {
+            console.error("Failed to fetch Xero invoices", error);
+            throw error;
+        } finally {
+            set({ isLoadingAllInvoices: false });
+        }
+    },
+
+    importInvoice: async (companyId, invoiceId) => {
+        try {
+            await api.post(`/xero/${companyId}/invoices/${invoiceId}/import`);
+            await useXeroStore.getState().fetchJobs(companyId, 1, 5);
+        } catch (error) {
+            console.error("Failed to import Xero invoice", error);
+            throw error;
         }
     },
 }));
