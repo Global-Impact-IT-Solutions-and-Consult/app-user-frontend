@@ -34,6 +34,7 @@ interface AuthState {
     // Actions
     signup: (data: Record<string, unknown>) => Promise<void>;
     login: (data: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    completeGoogleLogin: (tempToken: string, requiresMfa: boolean) => void;
     verifyMfa: (code: string) => Promise<void>;
     resendOtp: () => Promise<void>;
     fetchUser: () => Promise<void>;
@@ -116,6 +117,26 @@ export const useAuthStore = create<AuthState>()(
                     console.error('Login failed:', error);
                     throw error;
                 }
+            },
+
+            // Landed back from the Google OAuth callback (?google=ok&tempToken=...).
+            // Same shape as login()'s MFA-required branch, since the backend always
+            // routes a Google sign-in through the OTP step.
+            completeGoogleLogin: (tempToken, requiresMfa) => {
+                let userId: string | null = null;
+                try {
+                    const decoded = jwtDecode<DecodedToken>(tempToken);
+                    userId = decoded.userId;
+                } catch (e) {
+                    console.error("Failed to decode tempToken", e);
+                }
+
+                set({
+                    tempToken,
+                    requiresMfa,
+                    userId,
+                    tempMfaEnabled: false,
+                });
             },
 
             verifyMfa: async (code) => {

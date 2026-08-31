@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import VerifyAccount from "./pages/VerifyAccount";
+import GoogleCallback from "./pages/GoogleCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import OnboardingFlow from "./pages/OnboardingFlow";
@@ -26,6 +27,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify-account" element={<VerifyAccount />} />
+        <Route path="/auth/google" element={<GoogleCallback />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
       </Route>
