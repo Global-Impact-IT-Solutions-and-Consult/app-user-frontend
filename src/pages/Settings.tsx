@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
@@ -1009,22 +1009,47 @@ const UserManagementTab = () => {
 
 const DangerZoneTab = () => {
     const { clearLogs } = useLogStore();
+    const { currentCompany, resetApiConfig, deleteCompany } = useCompanyStore();
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     const [clearLogsOpen, setClearLogsOpen] = React.useState(false);
-
-    const handleAction = async (title: string) => {
-        if (title === "Clear All Logs") {
-            setClearLogsOpen(true);
-        } else {
-            toast({ title: "Not Available", description: "This action is not fully implemented in this demo.", variant: "warning" });
-        }
-    };
+    const [resetApiOpen, setResetApiOpen] = React.useState(false);
+    const [deleteCompanyOpen, setDeleteCompanyOpen] = React.useState(false);
 
     const handleConfirmClearLogs = async () => {
         await clearLogs();
         toast({ title: "Logs cleared", description: "System logs have been permanently deleted.", variant: "success" });
         setClearLogsOpen(false);
+    };
+
+    const handleConfirmResetApiConfig = async () => {
+        if (!currentCompany?.id) return;
+        try {
+            await resetApiConfig(currentCompany.id);
+            toast({
+                title: "API configuration reset",
+                description: "New TEST and LIVE keys were generated and all webhooks were disabled.",
+                variant: "success",
+            });
+        } catch {
+            toast({ title: "Couldn't reset API configuration", variant: "error" });
+        }
+    };
+
+    const handleConfirmDeleteCompany = async () => {
+        if (!currentCompany?.id) return;
+        try {
+            await deleteCompany(currentCompany.id, currentCompany.name);
+            toast({ title: "Company deleted", description: `${currentCompany.name} has been permanently deleted.`, variant: "success" });
+            // Auto-switches to another company if one remains (handled in the
+            // store); only leave Settings if none are left to fall back to.
+            if (!useCompanyStore.getState().currentCompany) {
+                navigate("/onboarding");
+            }
+        } catch {
+            toast({ title: "Couldn't delete company", description: "Failed to delete this company.", variant: "error" });
+        }
     };
 
     return (
@@ -1040,41 +1065,52 @@ const DangerZoneTab = () => {
             </header>
 
             <section className="space-y-4">
-                {[
-                    {
-                        title: "Clear All Logs",
-                        desc: "Permanently delete all system and audit logs",
-                        btnText: "Clear Logs",
-                        icon: Trash2
-                    },
-                    {
-                        title: "Reset API Configuration",
-                        desc: "Reset all API keys and webhook settings to defaults",
-                        btnText: "Reset",
-                        icon: RotateCcw
-                    },
-                    {
-                        title: "Delete Company Account",
-                        desc: "Permanently delete this company account and all data",
-                        btnText: "Delete Account",
-                        icon: Trash2
-                    }
-                ].map((action, i) => (
-                    <div key={i} className="flex items-center justify-between p-6 rounded-xl border border-surface-100 bg-white shadow-sm ring-1 ring-black/5 hover:ring-danger-500/20 transition-all">
-                        <div className="space-y-1">
-                            <p className="text-sm font-bold text-danger-600">{action.title}</p>
-                            <p className="text-xs text-surface-900/70 font-medium">{action.desc}</p>
-                        </div>
-                        <Button
-                            variant="danger"
-                            className="gap-2 h-11 px-6 font-bold shadow-lg shadow-danger-500/10"
-                            onClick={() => handleAction(action.title)}
-                        >
-                            <action.icon className="h-4 w-4" />
-                            {action.btnText}
-                        </Button>
+                <div className="flex items-center justify-between p-6 rounded-xl border border-surface-100 bg-white shadow-sm ring-1 ring-black/5 hover:ring-danger-500/20 transition-all">
+                    <div className="space-y-1">
+                        <p className="text-sm font-bold text-danger-600">Clear All Logs</p>
+                        <p className="text-xs text-surface-900/70 font-medium">Permanently delete all system and audit logs</p>
                     </div>
-                ))}
+                    <Button
+                        variant="danger"
+                        className="gap-2 h-11 px-6 font-bold shadow-lg shadow-danger-500/10"
+                        onClick={() => setClearLogsOpen(true)}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Clear Logs
+                    </Button>
+                </div>
+
+                <div className="flex items-center justify-between p-6 rounded-xl border border-surface-100 bg-white shadow-sm ring-1 ring-black/5 hover:ring-danger-500/20 transition-all">
+                    <div className="space-y-1">
+                        <p className="text-sm font-bold text-danger-600">Reset API Configuration</p>
+                        <p className="text-xs text-surface-900/70 font-medium">Regenerate TEST and LIVE API keys and disable all webhooks</p>
+                    </div>
+                    <Button
+                        variant="danger"
+                        className="gap-2 h-11 px-6 font-bold shadow-lg shadow-danger-500/10"
+                        onClick={() => setResetApiOpen(true)}
+                        disabled={!currentCompany?.id}
+                    >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset
+                    </Button>
+                </div>
+
+                <div className="flex items-center justify-between p-6 rounded-xl border border-surface-100 bg-white shadow-sm ring-1 ring-black/5 hover:ring-danger-500/20 transition-all">
+                    <div className="space-y-1">
+                        <p className="text-sm font-bold text-danger-600">Delete Company Account</p>
+                        <p className="text-xs text-surface-900/70 font-medium">Permanently delete this company account and all data</p>
+                    </div>
+                    <Button
+                        variant="danger"
+                        className="gap-2 h-11 px-6 font-bold shadow-lg shadow-danger-500/10"
+                        onClick={() => setDeleteCompanyOpen(true)}
+                        disabled={!currentCompany?.id}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Account
+                    </Button>
+                </div>
             </section>
 
             <ConfirmModal
@@ -1084,6 +1120,25 @@ const DangerZoneTab = () => {
                 title="Clear All Logs"
                 description="Are you sure you want to clear all system logs? This action cannot be undone."
                 confirmText="Clear Logs"
+            />
+
+            <ConfirmModal
+                isOpen={resetApiOpen}
+                onClose={() => setResetApiOpen(false)}
+                onConfirm={handleConfirmResetApiConfig}
+                title="Reset API Configuration?"
+                description="This immediately generates new TEST and LIVE API keys and disables every webhook. Anything using the current keys or webhooks will stop working right away."
+                confirmText="Reset Configuration"
+            />
+
+            <ConfirmModal
+                isOpen={deleteCompanyOpen}
+                onClose={() => setDeleteCompanyOpen(false)}
+                onConfirm={handleConfirmDeleteCompany}
+                title="Delete Company Account?"
+                description="This permanently deletes this company and all of its data. This cannot be undone."
+                confirmText="Delete Company"
+                confirmationValue={currentCompany?.name}
             />
         </div >
     );

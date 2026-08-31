@@ -116,6 +116,10 @@ interface CompanyState {
     fetchApiKeys: (companyId: string) => Promise<void>;
     revokeApiKey: (companyId: string, keyId: string) => Promise<void>;
     regenerateApiKey: (companyId: string, type: 'live' | 'test') => Promise<void>;
+
+    // Danger Zone
+    resetApiConfig: (companyId: string) => Promise<void>;
+    deleteCompany: (companyId: string, confirmation: string) => Promise<void>;
 }
 
 export const useCompanyStore = create<CompanyState>()(
@@ -405,6 +409,44 @@ export const useCompanyStore = create<CompanyState>()(
                 } catch (error) {
                     console.error("Failed to regenerate API key", error);
                     set({ error: (error as ApiError).response?.data?.message || 'Failed to regenerate API key' });
+                    throw error;
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
+
+            resetApiConfig: async (companyId) => {
+                set({ isLoading: true, error: null });
+                try {
+                    await api.post(`/companies/${companyId}/reset-api-config`);
+                    // Keys and webhooks both changed server-side - refetch rather than
+                    // guess the new shape from this response.
+                    await useCompanyStore.getState().fetchCompanySettings(companyId);
+                    await useCompanyStore.getState().fetchWebhooks(companyId);
+                } catch (error) {
+                    console.error("Failed to reset API configuration", error);
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to reset API configuration' });
+                    throw error;
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
+
+            deleteCompany: async (companyId, confirmation) => {
+                set({ isLoading: true, error: null });
+                try {
+                    await api.delete(`/companies/${companyId}`, { data: { confirmation } });
+                    set(state => {
+                        const remaining = state.companies.filter(c => c.id !== companyId);
+                        const wasCurrent = state.currentCompany?.id === companyId;
+                        return {
+                            companies: remaining,
+                            currentCompany: wasCurrent ? (remaining[0] || null) : state.currentCompany,
+                        };
+                    });
+                } catch (error) {
+                    console.error("Failed to delete company", error);
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to delete company' });
                     throw error;
                 } finally {
                     set({ isLoading: false });

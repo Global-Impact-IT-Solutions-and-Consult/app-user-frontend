@@ -1,5 +1,7 @@
+import * as React from "react";
 import { X, AlertTriangle } from "lucide-react";
 import { Button } from "./Button";
+import { Input } from "./Input";
 
 interface ConfirmModalProps {
     isOpen: boolean;
@@ -10,6 +12,10 @@ interface ConfirmModalProps {
     confirmText?: string;
     cancelText?: string;
     variant?: "danger" | "warning" | "default";
+    // When set, the confirm button stays disabled until the user types this
+    // value exactly - for actions too destructive for a plain confirm/cancel.
+    confirmationValue?: string;
+    confirmationLabel?: string;
 }
 
 export const ConfirmModal = ({
@@ -20,9 +26,20 @@ export const ConfirmModal = ({
     description,
     confirmText = "Confirm",
     cancelText = "Cancel",
-    variant = "danger"
+    variant = "danger",
+    confirmationValue,
+    confirmationLabel,
 }: ConfirmModalProps) => {
+    const [typedValue, setTypedValue] = React.useState("");
+
+    React.useEffect(() => {
+        if (isOpen) setTypedValue("");
+    }, [isOpen]);
+
     if (!isOpen) return null;
+
+    const requiresTyping = Boolean(confirmationValue);
+    const canConfirm = !requiresTyping || typedValue === confirmationValue;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -40,6 +57,20 @@ export const ConfirmModal = ({
                     <p className="text-sm text-surface-500">{description}</p>
                 </div>
 
+                {requiresTyping && (
+                    <div className="space-y-1.5 text-left">
+                        <label className="text-xs font-bold text-surface-900">
+                            {confirmationLabel || `Type "${confirmationValue}" to confirm`}
+                        </label>
+                        <Input
+                            value={typedValue}
+                            onChange={(e) => setTypedValue(e.target.value)}
+                            placeholder={confirmationValue}
+                            autoFocus
+                        />
+                    </div>
+                )}
+
                 <div className="flex gap-4">
                     <Button
                         variant="outline"
@@ -51,6 +82,7 @@ export const ConfirmModal = ({
                     <Button
                         variant={variant === 'danger' ? 'danger' : 'primary'}
                         className={`flex-1 font-bold h-11 ${variant === 'danger' ? 'shadow-lg shadow-danger-500/20' : ''}`}
+                        disabled={!canConfirm}
                         onClick={() => {
                             onConfirm();
                             onClose();
