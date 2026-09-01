@@ -36,6 +36,8 @@ interface AuthState {
     login: (data: Record<string, unknown>) => Promise<Record<string, unknown>>;
     completeGoogleLogin: (tempToken: string, requiresMfa: boolean) => void;
     verifyMfa: (code: string) => Promise<void>;
+    forgotPassword: (email: string) => Promise<void>;
+    resetPassword: (token: string, password: string) => Promise<void>;
     resendOtp: () => Promise<void>;
     fetchUser: () => Promise<void>;
     setupMfa: () => Promise<{ qrCode: string; secret: string; manualEntryKey: string }>;
@@ -162,6 +164,27 @@ export const useAuthStore = create<AuthState>()(
                     });
                 } catch (error) {
                     console.error('MFA Verification failed:', error);
+                    throw error;
+                }
+            },
+
+            // Backend always returns the same generic message whether or not
+            // the email exists, to avoid leaking account existence - never
+            // branch UI behavior on this response's content.
+            forgotPassword: async (email) => {
+                try {
+                    await api.post('/auth/forgot-password', { email });
+                } catch (error) {
+                    console.error('Forgot password failed:', error);
+                    throw error;
+                }
+            },
+
+            resetPassword: async (token, password) => {
+                try {
+                    await api.post('/auth/reset-password', { token, password });
+                } catch (error) {
+                    console.error('Reset password failed:', error);
                     throw error;
                 }
             },
