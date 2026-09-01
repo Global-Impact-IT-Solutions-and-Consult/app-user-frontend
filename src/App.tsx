@@ -5,6 +5,7 @@ import VerifyAccount from "./pages/VerifyAccount";
 import GoogleCallback from "./pages/GoogleCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import AcceptInvite from "./pages/AcceptInvite";
 import OnboardingFlow from "./pages/OnboardingFlow";
 import Dashboard from "./pages/Dashboard";
 import Invoices from "./pages/Invoices";
@@ -23,6 +24,9 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/signup" replace />} />
+      {/* Public regardless of auth state - an already-logged-in user can still
+          accept an invite to a different company, so this isn't guest-only. */}
+      <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route element={<RequireGuest />}>
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />

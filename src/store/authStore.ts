@@ -38,6 +38,7 @@ interface AuthState {
     verifyMfa: (code: string) => Promise<void>;
     forgotPassword: (email: string) => Promise<void>;
     resetPassword: (token: string, password: string) => Promise<void>;
+    acceptInvite: (token: string, password?: string, firstName?: string, lastName?: string) => Promise<{ companyName: string }>;
     resendOtp: () => Promise<void>;
     fetchUser: () => Promise<void>;
     setupMfa: () => Promise<{ qrCode: string; secret: string; manualEntryKey: string }>;
@@ -185,6 +186,19 @@ export const useAuthStore = create<AuthState>()(
                     await api.post('/auth/reset-password', { token, password });
                 } catch (error) {
                     console.error('Reset password failed:', error);
+                    throw error;
+                }
+            },
+
+            // Doesn't log the user in - it only creates/links their account to the
+            // company. They still go through normal login afterward for a session.
+            acceptInvite: async (token, password, firstName, lastName) => {
+                try {
+                    const response = await api.post('/auth/accept-invite', { token, password, firstName, lastName });
+                    const result = response.data.data || response.data;
+                    return { companyName: result?.companyName || '' };
+                } catch (error) {
+                    console.error('Accept invite failed:', error);
                     throw error;
                 }
             },

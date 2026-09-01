@@ -12,14 +12,14 @@ import {
     Copy,
     Zap,
     UserPlus,
-    Edit3,
     Trash2,
     AlertTriangle,
     Info,
     Clock,
     X,
     Key,
-    Ban
+    Ban,
+    Mail
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useCompanyStore } from "../store/companyStore";
@@ -782,21 +782,24 @@ const SecurityTab = () => {
     );
 };
 
-const AddUserModal = ({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd?: (user: Record<string, unknown>) => void }) => {
+const AddUserModal = ({ isOpen, onClose, onInvite }: { isOpen: boolean; onClose: () => void; onInvite: (email: string, role: 'member' | 'admin') => Promise<void> }) => {
+    const [email, setEmail] = React.useState("");
+    const [role, setRole] = React.useState<'member' | 'admin'>('member');
+    const [isSending, setIsSending] = React.useState(false);
+
     if (!isOpen) return null;
 
-    const handleAdd = () => {
-        // For now, mock it.
-        if (onAdd) {
-            onAdd({
-                name: "New User",
-                email: "new.user@example.com",
-                role: "User",
-                initials: "NU",
-                roleColor: "bg-success-50 text-success-500"
-            });
+    const handleAdd = async () => {
+        if (!email) return;
+        setIsSending(true);
+        try {
+            await onInvite(email, role);
+            setEmail("");
+            setRole('member');
+            onClose();
+        } finally {
+            setIsSending(false);
         }
-        onClose();
     };
 
     return (
@@ -807,32 +810,34 @@ const AddUserModal = ({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: ()
                     <X className="h-5 w-5" />
                 </button>
                 <div className="text-center space-y-1">
-                    <h2 className="text-xl font-bold text-primary-700 font-serif">Add New User</h2>
-                    <p className="text-sm text-surface-500">Add a new user to to account</p>
+                    <h2 className="text-xl font-bold text-primary-700 font-serif">Invite a Team Member</h2>
+                    <p className="text-sm text-surface-500">Send an invite to join this company</p>
                 </div>
                 <div className="space-y-4">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-surface-900">Name *</label>
-                        <Input placeholder="Full Name" />
-                    </div>
-                    <div className="space-y-1.5">
                         <label className="text-xs font-bold text-surface-900">Email *</label>
-                        <Input placeholder="example@acmemfg.com" />
+                        <Input
+                            type="email"
+                            placeholder="example@acmemfg.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                        />
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-surface-900">Role*</label>
-                        <Select>
-                            <option>User</option>
-                            <option>Admin</option>
-                            <option>Viewer</option>
+                        <Select value={role} onChange={(e) => setRole(e.target.value as 'member' | 'admin')}>
+                            <option value="member">Member</option>
+                            <option value="admin">Admin</option>
                         </Select>
                     </div>
                 </div>
                 <div className="space-y-4">
-                    <Button className="w-full font-bold h-11" onClick={handleAdd}>Add User</Button>
+                    <Button className="w-full font-bold h-11" onClick={handleAdd} disabled={!email || isSending}>
+                        {isSending ? "Sending..." : "Send Invite"}
+                    </Button>
                     <p className="text-xs text-center text-surface-500 flex items-center justify-center gap-1.5">
                         <div className="h-3.5 w-3.5 rounded-full bg-primary-500 text-white flex items-center justify-center text-[8px] font-bold">i</div>
-                        A link will be sent to the new user Email to set up their account
+                        A link will be sent to this email to join the company
                     </p>
                 </div>
             </div>
@@ -846,39 +851,6 @@ interface SettingsUser {
     email: string;
     role: string;
 }
-
-const EditUserModal = ({ isOpen, onClose, user, onDeleteClick }: { isOpen: boolean; onClose: () => void; user: SettingsUser | null; onDeleteClick: () => void }) => {
-    if (!isOpen || !user) return null;
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 p-8 space-y-8">
-                <button onClick={onClose} className="absolute right-4 top-4 p-2 hover:bg-surface-50 rounded-lg transition-colors text-surface-400 hover:text-surface-900">
-                    <X className="h-5 w-5" />
-                </button>
-                <div className="text-center space-y-1">
-                    <h2 className="text-2xl font-bold text-primary-700 font-serif">{user.name}</h2>
-                    <p className="text-sm text-surface-500">{user.email}</p>
-                </div>
-                <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-surface-900">Role*</label>
-                    <Select defaultValue={user.role}>
-                        <option value="User">User</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Viewer">Viewer</option>
-                    </Select>
-                </div>
-                <div className="space-y-6">
-                    <Button className="w-full font-bold h-11" onClick={onClose}>Save Changes</Button>
-                    <button onClick={onDeleteClick} className="w-full text-center text-xs font-bold text-danger-500 hover:text-danger-600 flex items-center justify-center gap-1.5">
-                        <div className="h-3.5 w-3.5 rounded-full bg-danger-500 text-white flex items-center justify-center text-[8px] font-bold">i</div>
-                        Delete User
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const DeleteUserModal = ({ isOpen, onClose, user, onConfirm }: { isOpen: boolean; onClose: () => void; user: SettingsUser | null; onConfirm: () => void }) => {
     if (!isOpen || !user) return null;
@@ -904,24 +876,63 @@ const DeleteUserModal = ({ isOpen, onClose, user, onConfirm }: { isOpen: boolean
 };
 
 const UserManagementTab = () => {
-    const { currentCompany } = useCompanyStore();
-    // Use members from store. If we want to edit locally, we'd copy to state, but for now display store.
+    const { currentCompany, invites, fetchInvites, fetchCompanyMembers, inviteMember, revokeInvite, removeMember } = useCompanyStore();
 
     const [isAddOpen, setIsAddOpen] = React.useState(false);
-    const [editUser, setEditUser] = React.useState<SettingsUser | null>(null);
     const [deleteUser, setDeleteUser] = React.useState<SettingsUser | null>(null);
     const { toast } = useToast();
+
+    React.useEffect(() => {
+        if (!currentCompany?.id) return;
+        fetchInvites(currentCompany.id);
+        fetchCompanyMembers(currentCompany.id);
+    }, [currentCompany?.id, fetchInvites, fetchCompanyMembers]);
 
     // Map company members to display format
     const users = currentCompany?.members?.map(m => ({
         id: m.id,
         name: `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email.split('@')[0], // Fallback name
         email: m.email,
-        role: m.roles && m.roles.length > 0 ? m.roles[0] : 'User',
+        role: m.roles && m.roles.includes('admin') ? 'Admin' : 'Member',
         initials: (m.firstName && m.lastName) ? `${m.firstName[0]}${m.lastName[0]}` : m.email.substring(0, 2).toUpperCase(),
         roleColor: m.roles && m.roles.includes('admin') ? "bg-primary-50 text-primary-500" : "bg-success-50 text-success-500",
-        original: m
     })) || [];
+
+    const pendingInvites = invites.filter(i => i.status === 'pending');
+
+    const handleInvite = async (email: string, role: 'member' | 'admin') => {
+        if (!currentCompany?.id) return;
+        try {
+            await inviteMember(currentCompany.id, email, role);
+            toast({ title: "Invite sent", description: `${email} has been invited to join.`, variant: "success" });
+        } catch (err) {
+            const message = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
+            toast({ title: "Couldn't send invite", description: message || "Failed to invite this member.", variant: "error" });
+            throw err;
+        }
+    };
+
+    const handleRevokeInvite = async (inviteId: string, email: string) => {
+        if (!currentCompany?.id) return;
+        try {
+            await revokeInvite(currentCompany.id, inviteId);
+            toast({ title: "Invite revoked", description: `${email}'s invite has been revoked.`, variant: "default" });
+        } catch {
+            toast({ title: "Couldn't revoke invite", variant: "error" });
+        }
+    };
+
+    const handleRemoveMember = async () => {
+        if (!currentCompany?.id || !deleteUser) return;
+        try {
+            await removeMember(currentCompany.id, deleteUser.id);
+            toast({ title: "Member removed", description: `${deleteUser.name} has been removed.`, variant: "default" });
+        } catch {
+            toast({ title: "Couldn't remove member", description: "Failed to remove this member.", variant: "error" });
+        } finally {
+            setDeleteUser(null);
+        }
+    };
 
     return (
         <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -937,7 +948,7 @@ const UserManagementTab = () => {
                 </div>
                 <Button className="gap-2 h-11 px-6 font-bold shadow-md shadow-primary-500/20" onClick={() => setIsAddOpen(true)}>
                     <UserPlus className="h-4 w-4" />
-                    Add User
+                    Invite Member
                 </Button>
             </header>
 
@@ -958,50 +969,71 @@ const UserManagementTab = () => {
                                 <p className="text-xs text-surface-900/70 font-medium">{user.email}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="outline" className="h-9 px-4 gap-2 text-xs font-bold border-surface-200" onClick={() => setEditUser(user)}>
-                                <Edit3 className="h-3.5 w-3.5 text-primary-500" />
-                                Edit
-                            </Button>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button variant="danger" className="h-9 px-4 gap-2 text-xs font-bold bg-danger-50 text-danger-500 border-none hover:bg-danger-100" onClick={() => setDeleteUser(user)}>
                                 <Trash2 className="h-3.5 w-3.5" />
-                                Delete User
+                                Remove
                             </Button>
                         </div>
                     </div>
                 ))}
             </section>
 
+            {pendingInvites.length > 0 && (
+                <section className="pt-6 border-t border-surface-100 space-y-4">
+                    <h3 className="text-sm font-bold text-surface-900">Pending Invites</h3>
+                    <div className="space-y-3">
+                        {pendingInvites.map((invite) => (
+                            <div key={invite.id} className="flex items-center justify-between p-3 rounded-xl border border-surface-100 bg-surface-50/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-9 w-9 rounded-full bg-warning-50 flex items-center justify-center text-warning-500">
+                                        <Mail className="h-4 w-4" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-bold text-surface-900">{invite.email}</p>
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-warning-50 text-warning-600">
+                                                {invite.role}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-surface-900/60 flex items-center gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            Expires {new Date(invite.expiresAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    className="h-9 px-4 gap-2 text-xs font-bold border-surface-200 text-danger-500"
+                                    onClick={() => handleRevokeInvite(invite.id, invite.email)}
+                                >
+                                    <Ban className="h-3.5 w-3.5" />
+                                    Revoke
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
             <section className="pt-6 border-t border-surface-100 space-y-4">
                 <h3 className="text-sm font-bold text-surface-900">Role Permissions</h3>
                 <div className="flex items-center gap-2 text-[11px] text-primary-600 font-medium bg-primary-50/30 p-3 rounded-lg border border-primary-50">
                     <Info className="h-3.5 w-3.5" />
-                    Admin: Full access • User: Create/View invoices • Viewer: Read-only access
+                    Admin: Full access • Member: Standard access
                 </div>
             </section>
 
             <AddUserModal
                 isOpen={isAddOpen}
                 onClose={() => setIsAddOpen(false)}
-                onAdd={(newUser) => console.log("Add user not implemented via store yet", newUser)}
-            />
-            <EditUserModal
-                isOpen={!!editUser}
-                onClose={() => setEditUser(null)}
-                user={editUser}
-                onDeleteClick={() => {
-                    setDeleteUser(editUser);
-                    setEditUser(null);
-                }}
+                onInvite={handleInvite}
             />
             <DeleteUserModal
                 isOpen={!!deleteUser}
                 onClose={() => setDeleteUser(null)}
                 user={deleteUser}
-                onConfirm={() => {
-                    toast({ title: "Not Implemented", description: "Delete user not connected to API yet", variant: "warning" });
-                    setDeleteUser(null);
-                }}
+                onConfirm={handleRemoveMember}
             />
         </div>
     );

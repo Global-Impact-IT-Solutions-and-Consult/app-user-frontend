@@ -39,6 +39,15 @@ export interface CompanySettingsResponse {
     settings: CompanySetting[];
 }
 
+export interface CompanyInvite {
+    id: string;
+    email: string;
+    role: 'member' | 'admin';
+    status: 'pending' | 'accepted' | 'revoked' | 'expired';
+    expiresAt: string;
+    createdAt: string;
+}
+
 interface Company {
     id: string;
     name: string;
@@ -91,6 +100,7 @@ interface CompanyState {
     companySettings: CompanySettingsResponse | null;
     webhooks: Webhook[];
     apiKeys: ApiKey[];
+    invites: CompanyInvite[];
 
     // Actions
     createCompany: (data: Record<string, unknown>) => Promise<void>;
@@ -99,8 +109,10 @@ interface CompanyState {
     fetchCompanies: () => Promise<void>;
     setCurrentCompany: (company: Company) => void;
     fetchCompanyMembers: (companyId: string) => Promise<void>;
-    inviteMember: (companyId: string, email: string, role: string) => Promise<void>;
-    removeMember: (companyId: string, userId: string) => Promise<void>;
+    inviteMember: (companyId: string, email: string, role: 'member' | 'admin') => Promise<void>;
+    removeMember: (companyId: string, memberId: string) => Promise<void>;
+    fetchInvites: (companyId: string) => Promise<void>;
+    revokeInvite: (companyId: string, inviteId: string) => Promise<void>;
 
     // Webhooks
     fetchWebhooks: (companyId: string) => Promise<void>;
@@ -132,6 +144,7 @@ export const useCompanyStore = create<CompanyState>()(
             companySettings: null,
             webhooks: [],
             apiKeys: [],
+            invites: [],
 
             createCompany: async (data) => {
                 set({ isLoading: true, error: null });
@@ -190,19 +203,87 @@ export const useCompanyStore = create<CompanyState>()(
                 }
             },
 
-            fetchCompanyMembers: async () => {
-                // Placeholder
+            // currentCompany.members only reflects reality as of whenever
+            // fetchCompanies() last ran (e.g. login) - it doesn't pick up a
+            // teammate accepting an invite elsewhere. This is the live refresh.
+            fetchCompanyMembers: async (companyId) => {
+                set({ isLoading: true, error: null });
+                try {
+                    const response = await api.get(`/companies/${companyId}/members`);
+                    const result = response.data.data || response.data;
+                    const members = Array.isArray(result) ? result : [];
+                    set(state => ({
+                        currentCompany: state.currentCompany?.id === companyId
+                            ? { ...state.currentCompany, members }
+                            : state.currentCompany,
+                        companies: state.companies.map(c => c.id === companyId ? { ...c, members } : c),
+                    }));
+                } catch (error) {
+                    console.error("Failed to fetch company members", error);
+                } finally {
+                    set({ isLoading: false });
+                }
             },
 
-            inviteMember: async () => {
-                // Placeholder
+            inviteMember: async (companyId, email, role) => {
+                set({ isLoading: true, error: null });
+                try {
+                    const response = await api.post(`/companies/${companyId}/invites`, { email, role });
+                    const result = response.data.data || response.data;
+                    set(state => ({ invites: [...state.invites, result] }));
+                } catch (error) {
+                    console.error("Failed to invite member", error);
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to invite member' });
+                    throw error;
+                } finally {
+                    set({ isLoading: false });
+                }
             },
 
-            removeMember: async () => {
-                // Placeholder
+            removeMember: async (companyId, memberId) => {
+                set({ isLoading: true, error: null });
+                try {
+                    await api.delete(`/companies/${companyId}/members/${memberId}`);
+                    set(state => ({
+                        currentCompany: state.currentCompany
+                            ? { ...state.currentCompany, members: state.currentCompany.members.filter(m => m.id !== memberId) }
+                            : state.currentCompany,
+                    }));
+                } catch (error) {
+                    console.error("Failed to remove member", error);
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to remove member' });
+                    throw error;
+                } finally {
+                    set({ isLoading: false });
+                }
             },
 
+            fetchInvites: async (companyId) => {
+                set({ isLoading: true, error: null });
+                try {
+                    const response = await api.get(`/companies/${companyId}/invites`);
+                    const result = response.data.data || response.data;
+                    set({ invites: Array.isArray(result) ? result : [] });
+                } catch (error) {
+                    console.error("Failed to fetch invites", error);
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
 
+            revokeInvite: async (companyId, inviteId) => {
+                set({ isLoading: true, error: null });
+                try {
+                    await api.delete(`/companies/${companyId}/invites/${inviteId}`);
+                    set(state => ({ invites: state.invites.filter(i => i.id !== inviteId) }));
+                } catch (error) {
+                    console.error("Failed to revoke invite", error);
+                    set({ error: (error as ApiError).response?.data?.message || 'Failed to revoke invite' });
+                    throw error;
+                } finally {
+                    set({ isLoading: false });
+                }
+            },
 
             fetchCompanies: async () => {
                 console.log("Fetching companies...");
