@@ -50,6 +50,22 @@ export default function VerifyAccount() {
         }
     };
 
+    const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+        e.preventDefault();
+        const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+        if (!pasted) return;
+
+        const newOtp = ["", "", "", "", "", ""];
+        for (let i = 0; i < pasted.length; i++) {
+            newOtp[i] = pasted[i];
+        }
+        setOtp(newOtp);
+
+        const nextIndex = Math.min(pasted.length, 5);
+        const nextInput = document.getElementById(`otp-${nextIndex}`);
+        if (nextInput) nextInput.focus();
+    };
+
     const handleVerify = async () => {
         const code = otp.join("");
         if (code.length !== 6) {
@@ -107,7 +123,7 @@ export default function VerifyAccount() {
                 <div className="flex w-full flex-col justify-center items-center lg:w-7/12 p-8 sm:p-12 lg:p-16">
                     <div className="mb-10 w-full">
                         <h1 className="text-3xl font-bold text-primary-500 mb-2 font-serif">Verify Your Account</h1>
-                        <p className="text-surface-500 text-sm leading-relaxed max-w-sm mx-auto">
+                        <p className="text-surface-500 text-sm leading-relaxed max-w-sm lg:mx-auto">
                             We’ve sent you a one time code to login. Please check your email and enter the code below.
                         </p>
                     </div>
@@ -130,6 +146,7 @@ export default function VerifyAccount() {
                                     value={digit}
                                     onChange={(e) => handleOtpChange(i, e.target.value)}
                                     onKeyDown={(e) => handleKeyDown(i, e)}
+                                    onPaste={handleOtpPaste}
                                     className="w-12 h-14 border border-[#E2E8F0] rounded-lg text-center text-xl font-bold focus:border-primary-500 focus:ring-1 focus:ring-primary-500 bg-[#F8F9FA] outline-none transition-all"
                                 />
                             ))}
