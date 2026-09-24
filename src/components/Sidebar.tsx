@@ -12,8 +12,10 @@ import {
 import { cn } from "../lib/utils";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
+import { Select } from "./ui/Select";
 import { useAuthStore } from "../store/authStore";
 import { useCompanyStore } from "../store/companyStore";
+import { useToast } from "./ui/Toast";
 
 interface NavItemProps {
     icon: React.ElementType;
@@ -44,12 +46,27 @@ const NavItem = ({ icon: Icon, label, to, end }: NavItemProps) => (
 
 export const Sidebar = () => {
     const navigate = useNavigate();
-    const { logout, user, setEnvironment } = useAuthStore();
-    const { currentCompany, isLoading } = useCompanyStore();
+    const { logout, user, setEnvironment, switchCompany } = useAuthStore();
+    const { currentCompany, companies, isLoading } = useCompanyStore();
+    const { toast } = useToast();
+    const [isSwitchingCompany, setIsSwitchingCompany] = React.useState(false);
 
     const handleLogout = () => {
         logout();
         navigate("/login");
+    };
+
+    const handleSwitchCompany = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const companyId = e.target.value;
+        if (!companyId || companyId === currentCompany?.id) return;
+        setIsSwitchingCompany(true);
+        try {
+            await switchCompany(companyId);
+        } catch {
+            toast({ title: "Couldn't switch company", description: "Failed to switch to the selected company.", variant: "error" });
+        } finally {
+            setIsSwitchingCompany(false);
+        }
     };
 
     return (
@@ -118,7 +135,20 @@ export const Sidebar = () => {
                         AM
                     </div>
                     <div className="flex-1 overflow-hidden">
-                        <p className="truncate text-sm font-bold text-surface-900">{currentCompany?.name || "No Company"}</p>
+                        {companies.length > 1 ? (
+                            <Select
+                                value={currentCompany?.id || ""}
+                                onChange={handleSwitchCompany}
+                                disabled={isSwitchingCompany}
+                                className="h-auto py-1 px-2 text-sm font-bold border-transparent bg-transparent -ml-2"
+                            >
+                                {companies.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </Select>
+                        ) : (
+                            <p className="truncate text-sm font-bold text-surface-900">{currentCompany?.name || "No Company"}</p>
+                        )}
                         <p className="truncate text-[10px] text-surface-400 font-medium">{currentCompany?.taxId || "ID: ---"}</p>
                     </div>
                 </div>

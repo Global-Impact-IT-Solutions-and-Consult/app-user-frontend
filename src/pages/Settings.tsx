@@ -43,6 +43,12 @@ export default function Settings() {
     const location = useLocation();
     const initialTab = (location.state as { tab?: string } | null)?.tab;
     const [activeTab, setActiveTab] = React.useState(initialTab || "general");
+    const { currentCompany } = useCompanyStore();
+    // Companies/users predating the CompanyMembership migration default to
+    // 'admin' server-side, so undefined here (not yet loaded) stays
+    // permissive rather than flashing the tab away before the company loads.
+    const isAdmin = currentCompany?.currentUserRole !== 'member';
+    const visibleTabs = tabs.filter((tab) => tab.id !== "danger-zone" || isAdmin);
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -55,7 +61,7 @@ export default function Settings() {
             case "user-management":
                 return <UserManagementTab />;
             case "danger-zone":
-                return <DangerZoneTab />;
+                return isAdmin ? <DangerZoneTab /> : <GeneralTab />;
             default:
                 return <GeneralTab />;
         }
@@ -72,7 +78,7 @@ export default function Settings() {
 
             {/* Tabs */}
             <div className="flex bg-white rounded-xl border border-surface-200 p-1 shadow-sm">
-                {tabs.map((tab) => (
+                {visibleTabs.map((tab) => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
@@ -877,6 +883,7 @@ const DeleteUserModal = ({ isOpen, onClose, user, onConfirm }: { isOpen: boolean
 
 const UserManagementTab = () => {
     const { currentCompany, invites, fetchInvites, fetchCompanyMembers, inviteMember, revokeInvite, removeMember } = useCompanyStore();
+    const isAdmin = currentCompany?.currentUserRole !== 'member';
 
     const [isAddOpen, setIsAddOpen] = React.useState(false);
     const [deleteUser, setDeleteUser] = React.useState<SettingsUser | null>(null);
@@ -884,18 +891,21 @@ const UserManagementTab = () => {
 
     React.useEffect(() => {
         if (!currentCompany?.id) return;
-        fetchInvites(currentCompany.id);
+        // Listing invites is admin-only on the backend now - a member would
+        // just get a 403 here, so don't bother asking.
+        if (isAdmin) fetchInvites(currentCompany.id);
         fetchCompanyMembers(currentCompany.id);
-    }, [currentCompany?.id, fetchInvites, fetchCompanyMembers]);
+    }, [currentCompany?.id, isAdmin, fetchInvites, fetchCompanyMembers]);
 
     // Map company members to display format
     const users = currentCompany?.members?.map(m => ({
         id: m.id,
         name: `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email.split('@')[0], // Fallback name
         email: m.email,
-        role: m.roles && m.roles.includes('admin') ? 'Admin' : 'Member',
+        role: m.role === 'admin' ? 'Admin' : 'Member',
         initials: (m.firstName && m.lastName) ? `${m.firstName[0]}${m.lastName[0]}` : m.email.substring(0, 2).toUpperCase(),
-        roleColor: m.roles && m.roles.includes('admin') ? "bg-primary-50 text-primary-500" : "bg-success-50 text-success-500",
+        roleColor: m.role === 'admin' ? "bg-primary-50 text-primary-500" : "bg-success-50 text-success-500",
+        isCurrentUser: m.isCurrentUser,
     })) || [];
 
     const pendingInvites = invites.filter(i => i.status === 'pending');
@@ -946,10 +956,12 @@ const UserManagementTab = () => {
                         <p className="text-surface-900/70 text-sm">Manage team members and their permissions</p>
                     </div>
                 </div>
-                <Button className="gap-2 h-11 px-6 font-bold shadow-md shadow-primary-500/20" onClick={() => setIsAddOpen(true)}>
-                    <UserPlus className="h-4 w-4" />
-                    Invite Member
-                </Button>
+                {isAdmin && (
+                    <Button className="gap-2 h-11 px-6 font-bold shadow-md shadow-primary-500/20" onClick={() => setIsAddOpen(true)}>
+                        <UserPlus className="h-4 w-4" />
+                        Invite Member
+                    </Button>
+                )}
             </header>
 
             <section className="space-y-4">
@@ -969,17 +981,19 @@ const UserManagementTab = () => {
                                 <p className="text-xs text-surface-900/70 font-medium">{user.email}</p>
                             </div>
                         </div>
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="danger" className="h-9 px-4 gap-2 text-xs font-bold bg-danger-50 text-danger-500 border-none hover:bg-danger-100" onClick={() => setDeleteUser(user)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                                Remove
-                            </Button>
-                        </div>
+                        {isAdmin && !user.isCurrentUser && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="danger" className="h-9 px-4 gap-2 text-xs font-bold bg-danger-50 text-danger-500 border-none hover:bg-danger-100" onClick={() => setDeleteUser(user)}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Remove
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 ))}
             </section>
 
-            {pendingInvites.length > 0 && (
+            {isAdmin && pendingInvites.length > 0 && (
                 <section className="pt-6 border-t border-surface-100 space-y-4">
                     <h3 className="text-sm font-bold text-surface-900">Pending Invites</h3>
                     <div className="space-y-3">

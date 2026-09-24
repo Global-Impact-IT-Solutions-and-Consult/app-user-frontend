@@ -13,10 +13,12 @@ interface ApiError {
 export interface CompanyMember {
     id: string;
     email: string;
-    // Add other fields from response
-    roles: string[];
+    // Per-company role via CompanyMembership - replaced the old global
+    // roles: string[] once the backend added company-scoped membership.
+    role: 'admin' | 'member';
     isActive: boolean;
     lastLoginAt: string;
+    isCurrentUser?: boolean;
     firstName?: string; // If available or derived
     lastName?: string;
 }
@@ -71,6 +73,9 @@ interface Company {
     createdAt: string;
     updatedAt: string;
     members: CompanyMember[];
+    // Caller's role in *this* company (per-company, via CompanyMembership).
+    // Companies/users predating that migration default to 'admin' server-side.
+    currentUserRole?: 'admin' | 'member';
 }
 
 interface Webhook {

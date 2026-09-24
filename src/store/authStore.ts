@@ -11,6 +11,9 @@ interface User {
     lastName?: string;
     currentEnvironment?: 'test' | 'live';
     currentCompanyId?: string;
+    // Caller's role in currentCompanyId, per the new company-scoped
+    // CompanyMembership model (GET /auth/me).
+    currentCompanyRole?: 'admin' | 'member';
     isEmailVerified?: boolean;
     isMfaEnabled?: boolean;
 }
@@ -45,6 +48,7 @@ interface AuthState {
     enableMfa: (code: string, secret: string) => Promise<void>;
     disableMfa: (code: string) => Promise<void>;
     setEnvironment: (env: 'test' | 'live') => Promise<void>;
+    switchCompany: (companyId: string) => Promise<void>;
     logout: () => void;
 }
 
@@ -252,6 +256,31 @@ export const useAuthStore = create<AuthState>()(
                     }));
                 } catch (error) {
                     console.error('Switch environment failed:', error);
+                    throw error;
+                }
+            },
+
+            // Same endpoint as setEnvironment - it already accepts an optional
+            // companyId, it was just never sent. Also updates companyStore's
+            // currentCompany from the already-loaded companies[] (mirrors the
+            // cross-store update logout() already does).
+            switchCompany: async (companyId) => {
+                const env = get().user?.currentEnvironment || 'test';
+                try {
+                    const response = await api.post('/auth/switch-environment', { environment: env, companyId });
+                    const result = response.data.data || response.data;
+                    const { accessToken, currentEnvironment, currentCompanyId } = result;
+                    set(state => ({
+                        accessToken,
+                        user: state.user ? { ...state.user, currentEnvironment, currentCompanyId } : null,
+                    }));
+
+                    const company = useCompanyStore.getState().companies.find(c => c.id === companyId);
+                    if (company) {
+                        useCompanyStore.getState().setCurrentCompany(company);
+                    }
+                } catch (error) {
+                    console.error('Switch company failed:', error);
                     throw error;
                 }
             },
